@@ -42,19 +42,15 @@ export default function SectionSidebar({
         return (
           <div
             key={i}
-            className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
+            onClick={() => onSeek(section.startTimestamp, i)}
+            className={`group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
               isActive
                 ? 'bg-indigo-900/50 ring-1 ring-indigo-500/50'
                 : 'hover:bg-gray-800'
             }`}
           >
-            {/* Section info — click to seek */}
-            <button
-              onClick={() => onSeek(section.startTimestamp, i)}
-              className="flex min-h-[44px] flex-1 items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
-              aria-label={`Jump to section: ${section.title}`}
-              aria-current={isActive ? 'true' : undefined}
-            >
+            {/* Section info */}
+            <div className="flex min-h-[44px] flex-1 items-center gap-2">
               <span
                 className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${badge.className}`}
               >
@@ -67,29 +63,19 @@ export default function SectionSidebar({
               >
                 {section.title}
               </span>
-            </button>
-
-            {/* Play button (voice preview) */}
-            <button
-              onClick={() => onSeek(section.startTimestamp, i)}
-              aria-label={`Play section: ${section.title}`}
-              className="min-h-[44px] min-w-[44px] shrink-0 rounded-full p-2 text-gray-500 transition-colors hover:text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
-              </svg>
-            </button>
+            </div>
 
             {/* Download section button */}
             <button
-              onClick={() =>
+              onClick={(e) => {
+                e.stopPropagation()
                 downloadBlob(
                   `/api/download/${sessionId}?section=${i}`,
                   `section-${i}-${section.type}.mp3`
                 )
-              }
+              }}
               aria-label={`Download section: ${section.title}`}
-              className="min-h-[44px] min-w-[44px] shrink-0 rounded-full p-2 text-gray-500 transition-colors hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="min-h-[44px] min-w-[44px] shrink-0 cursor-pointer rounded-full p-2 text-gray-500 transition-colors hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />

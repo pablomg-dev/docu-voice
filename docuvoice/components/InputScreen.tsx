@@ -26,7 +26,6 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
   const [tab, setTab] = useState<Tab>('url')
   const [urlValue, setUrlValue] = useState('')
   const [textValue, setTextValue] = useState('')
-  const [backgroundMusic, setBackgroundMusic] = useState(false)
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('single')
   const [error, setError] = useState<string | null>(null)
 
@@ -53,9 +52,9 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
     }
     setError(null)
     if (tab === 'url') {
-      onSubmit({ url: urlValue.trim(), backgroundMusic, voiceMode })
+      onSubmit({ url: urlValue.trim(), backgroundMusic: false, voiceMode })
     } else {
-      onSubmit({ text: textValue, backgroundMusic, voiceMode })
+      onSubmit({ text: textValue, backgroundMusic: false, voiceMode })
     }
   }
 
@@ -80,7 +79,7 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
               <button
                 key={t}
                 onClick={() => { setTab(t); setError(null) }}
-                className={`min-h-[44px] flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                className={`min-h-[44px] flex-1 cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                   tab === t
                     ? 'bg-gray-700 text-white shadow'
                     : 'text-gray-400 hover:text-gray-200'
@@ -159,16 +158,6 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
               </div>
             </div>
 
-            {/* Background music toggle */}
-            <label className="mb-5 flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={backgroundMusic}
-                onChange={(e) => setBackgroundMusic(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500"
-              />
-              <span className="text-sm text-gray-400">Add ambient background music</span>
-            </label>
 
             {/* Error */}
             {error && (
@@ -180,7 +169,7 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
             {/* Actions */}
             <button
               type="submit"
-              className="min-h-[44px] w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+              className="min-h-[44px] w-full cursor-pointer rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
             >
               Generate Audio
             </button>

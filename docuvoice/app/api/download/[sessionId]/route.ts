@@ -52,12 +52,35 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
   // ── Full audio download ──────────────────────────────────────────────────
   const filename = deriveFilename(timeline.title)
+  const fullMp3 = timeline.fullMp3
+  const fileSize = fullMp3.length
+  const range = req.headers.get('range')
 
-  return new Response(new Uint8Array(timeline.fullMp3), {
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-")
+    const start = parseInt(parts[0], 10)
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+    const chunksize = (end - start) + 1
+    const file = fullMp3.subarray(start, end + 1)
+
+    return new Response(new Uint8Array(file), {
+      status: 206,
+      headers: {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': String(chunksize),
+        'Content-Type': 'audio/mpeg',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  }
+
+  return new Response(new Uint8Array(fullMp3), {
     headers: {
       'Content-Type': 'audio/mpeg',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(timeline.fullMp3.length),
+      'Content-Length': String(fileSize),
+      'Accept-Ranges': 'bytes',
     },
   })
 }

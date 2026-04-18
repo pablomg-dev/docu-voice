@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     )
   }
 
-  return Response.json({
+  const responseData = {
     sessionId: timeline.sessionId,
     title: timeline.title,
     sections: timeline.sections.map((s) => ({
@@ -32,5 +32,9 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       startTimestamp: s.startTimestamp,
       endTimestamp: s.endTimestamp,
     })),
-  })
+  };
+
+  console.log('API Session Response:', JSON.stringify(responseData.sections.map(s => ({ i: s.index, start: s.startTimestamp })), null, 2));
+
+  return Response.json(responseData)
 }

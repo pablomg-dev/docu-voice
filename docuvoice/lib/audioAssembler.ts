@@ -138,6 +138,12 @@ export async function assemble(input: AssembleInput): Promise<AudioTimeline> {
       }
     }
 
+    console.log('Assembled Timestamps:', timestampedSections.map(s => ({
+      title: s.title,
+      start: s.startTimestamp,
+      end: s.endTimestamp
+    })));
+
     // Concatenate all into a single MP3
     const concatTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docuvoice-out-'))
     const concatPath = path.join(concatTmpDir, 'full.mp3')

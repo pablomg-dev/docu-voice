@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { url, text, backgroundMusic = false, voiceMode = 'single' } = body
+  const { url, text, voiceMode = 'single' } = body
+  const backgroundMusic = false
 
   // Validate: must have url or text
   if (!url && !text) {
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
           sections,
           segments,
           transitions,
-          backgroundMusic: backgroundMusic ? undefined : undefined, // music generation handled separately
+          backgroundMusic: undefined,
           title: docTitle,
         })
 
