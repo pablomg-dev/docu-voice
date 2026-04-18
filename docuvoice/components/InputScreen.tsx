@@ -11,7 +11,6 @@ type Tab = 'url' | 'text'
 
 interface InputScreenProps {
   onSubmit: (input: { url?: string; text?: string; backgroundMusic: boolean; voiceMode: VoiceMode }) => void
-  onLoadDemo: () => void
 }
 
 function isValidUrl(value: string): boolean {
@@ -23,7 +22,7 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-export default function InputScreen({ onSubmit, onLoadDemo }: InputScreenProps) {
+export default function InputScreen({ onSubmit }: InputScreenProps) {
   const [tab, setTab] = useState<Tab>('url')
   const [urlValue, setUrlValue] = useState('')
   const [textValue, setTextValue] = useState('')
@@ -179,21 +178,12 @@ export default function InputScreen({ onSubmit, onLoadDemo }: InputScreenProps) 
             )}
 
             {/* Actions */}
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="submit"
-                className="min-h-[44px] flex-1 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-              >
-                Generate Audio
-              </button>
-              <button
-                type="button"
-                onClick={onLoadDemo}
-                className="min-h-[44px] rounded-lg border border-gray-700 px-6 py-3 text-sm font-medium text-gray-300 transition-colors hover:border-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-              >
-                Load Demo
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="min-h-[44px] w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900"
+            >
+              Generate Audio
+            </button>
           </form>
         </div>
       </div>
