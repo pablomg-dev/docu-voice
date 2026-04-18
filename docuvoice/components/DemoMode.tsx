@@ -17,7 +17,6 @@ export default function DemoMode({ onExit }: DemoModeProps) {
       sessionId={DEMO_SESSION_ID}
       sections={DEMO_SECTIONS}
       title={DEMO_TITLE}
-      isDemo={true}
       onBack={onExit}
     />
   )
