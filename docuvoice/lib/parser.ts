@@ -6,7 +6,7 @@ import rehypeStringify from 'rehype-stringify'
 import type { Root, Content, Heading, Code, Blockquote, List } from 'mdast'
 import type { SectionType, Section } from '@/types'
 
-const MIN_SECTIONS = 3
+const MIN_SECTIONS = 1
 
 const WARNING_KEYWORDS = /\b(warning|caution|danger|note)\b/i
 
