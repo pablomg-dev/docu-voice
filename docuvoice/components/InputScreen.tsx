@@ -4,7 +4,7 @@ import { useState } from 'react'
 import ErrorBanner from '@/components/ErrorBanner'
 import type { VoiceMode } from '@/lib/voiceMap'
 
-const MAX_TEXT_LENGTH = 50_000
+const MAX_TEXT_LENGTH = 2_000
 const MIN_TEXT_LENGTH = 100
 
 type Tab = 'url' | 'text'
