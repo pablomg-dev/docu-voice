@@ -1,5 +1,5 @@
 allowBuilds:
-  '@ffprobe-installer/linux-x64': set this to true or false
-  ffmpeg-static: set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  '@ffprobe-installer/linux-x64': true
+  ffmpeg-static: true
+  sharp: true
+  unrs-resolver: true
