@@ -1,7 +1,0 @@
-{
-  "build": {
-    "env": {
-      "PNPM_ONLY_BUILT_DEPENDENCIES": "@ffprobe-installer/linux-x64,ffmpeg-static,sharp,unrs-resolver"
-    }
-  }
-}
