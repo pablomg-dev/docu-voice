@@ -5,10 +5,11 @@ const nextConfig: NextConfig = {
   // These packages contain binary files (.exe, README.md) that cannot be
   // bundled for the browser — they must only run in API routes.
   serverExternalPackages: [
-    'fluent-ffmpeg',
-    'ffmpeg-static',
-    '@ffprobe-installer/ffprobe',
-    '@ffprobe-installer/win32-x64',
+    "fluent-ffmpeg",
+    "ffmpeg-static",
+    "@ffprobe-installer/ffprobe",
+    "@ffprobe-installer/linux-x64",
+    "@ffprobe-installer/win32-x64",
   ],
 
   // Turbopack: suppress "Unknown module type" errors for README.md and
@@ -19,15 +20,15 @@ const nextConfig: NextConfig = {
     ignoreIssue: [
       {
         // Matches any file inside @ffprobe-installer sub-packages
-        path: '**/node_modules/@ffprobe-installer/**',
+        path: "**/node_modules/@ffprobe-installer/**",
       },
       {
         // Matches README.md files inside ffmpeg-static
-        path: '**/node_modules/ffmpeg-static/**',
+        path: "**/node_modules/ffmpeg-static/**",
       },
       {
         // Matches any binary/non-JS asset inside fluent-ffmpeg
-        path: '**/node_modules/fluent-ffmpeg/**',
+        path: "**/node_modules/fluent-ffmpeg/**",
       },
     ],
   },
@@ -36,8 +37,8 @@ const nextConfig: NextConfig = {
     config.watchOptions = {
       poll: 1000,
       aggregateTimeout: 300,
-    }
-    return config
+    };
+    return config;
   },
 };
 
