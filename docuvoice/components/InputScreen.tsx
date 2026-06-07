@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import ErrorBanner from '@/components/ErrorBanner'
 import type { VoiceMode } from '@/lib/voiceMap'
 
@@ -22,12 +22,58 @@ function isValidUrl(value: string): boolean {
   }
 }
 
+function rewriteGitHubUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname !== 'github.com') return null
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    if (segments.length < 2) return null
+    const [owner, repo] = segments
+    if (segments.length === 2) {
+      return `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/README.md`
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function checkGitHubUrl(url: string): Promise<{ ok: boolean; rawUrl: string } | null> {
+  const rawUrl = rewriteGitHubUrl(url)
+  if (!rawUrl) return null
+  try {
+    const res = await fetch(rawUrl, { method: 'HEAD' })
+    return { ok: res.ok, rawUrl }
+  } catch {
+    return { ok: false, rawUrl }
+  }
+}
+
 export default function InputScreen({ onSubmit }: InputScreenProps) {
   const [tab, setTab] = useState<Tab>('url')
   const [urlValue, setUrlValue] = useState('')
   const [textValue, setTextValue] = useState('')
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('single')
   const [error, setError] = useState<string | null>(null)
+  const [urlWarning, setUrlWarning] = useState<string | null>(null)
+  const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleUrlChange(value: string) {
+    setUrlValue(value)
+    setError(null)
+    setUrlWarning(null)
+    if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
+    const trimmed = value.trim()
+    if (!isValidUrl(trimmed)) return
+    const rawUrl = rewriteGitHubUrl(trimmed)
+    if (!rawUrl) return
+    checkTimeoutRef.current = setTimeout(async () => {
+      const result = await checkGitHubUrl(trimmed)
+      if (result && !result.ok) {
+        setUrlWarning(`This repo's README may not be available. The server may fail to fetch it.`)
+      }
+    }, 800)
+  }
 
   function validate(): string | null {
     if (tab === 'url') {
@@ -100,11 +146,14 @@ export default function InputScreen({ onSubmit }: InputScreenProps) {
                   id="url-input"
                   type="url"
                   value={urlValue}
-                  onChange={(e) => { setUrlValue(e.target.value); setError(null) }}
+                  onChange={(e) => handleUrlChange(e.target.value)}
                   placeholder="https://github.com/vercel/next.js"
                   className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   aria-describedby={error ? 'input-error' : undefined}
                 />
+                {urlWarning && (
+                  <p className="mt-2 text-xs text-amber-400">{urlWarning}</p>
+                )}
               </div>
             ) : (
               <div className="mb-4">
