@@ -5,7 +5,7 @@
 Built with [Kiro](https://kiro.dev) spec-driven development + [ElevenLabs](https://elevenlabs.io) APIs for **ElevenHacks #5**.
 
 ## Demo
-[🚀 Live Demo](https://docu-voice-liart.vercel.app/) | [Watch Video](#)
+[🚀 Live Demo](https://docu-voice-nine.vercel.app/) | [Watch Video](#)
 
 ## What it does
 Paste any GitHub README URL and DocuVoice generates a navigable audio podcast with different voices per section type.
