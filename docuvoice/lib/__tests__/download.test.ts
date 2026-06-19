@@ -1,46 +1,26 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { downloadBlob } from "@/lib/download";
 
 describe("downloadBlob", () => {
-  const originalCreateObjectURL = URL.createObjectURL;
-  const originalRevokeObjectURL = URL.revokeObjectURL;
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    URL.createObjectURL = vi.fn(() => "blob:download-test");
-    URL.revokeObjectURL = vi.fn();
-  });
-
   afterEach(() => {
-    vi.useRealTimers();
-    URL.createObjectURL = originalCreateObjectURL;
-    URL.revokeObjectURL = originalRevokeObjectURL;
     vi.restoreAllMocks();
   });
 
-  it("throws when the download response is not successful", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-      }),
-    );
+  it("fetches the URL as a blob and creates a download anchor", async () => {
+    const fakeBlob = new Blob(["fake mp3 data"], { type: "audio/mpeg" });
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
 
-    await expect(downloadBlob("/bad-url", "test.mp3")).rejects.toThrow(
-      "Failed to download",
-    );
-  });
-
-  it("revoke the object URL after the download starts", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob(["audio"])),
-      }),
-    );
+    const fakeObjectUrl = "blob:http://localhost/fake-uuid";
+    const createObjectUrlSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue(fakeObjectUrl);
+    const revokeObjectUrlSpy = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => {});
 
     const click = vi.fn();
     const remove = vi.fn();
@@ -56,13 +36,36 @@ describe("downloadBlob", () => {
       },
     );
 
+    vi.useFakeTimers();
+
     await downloadBlob("/api/download/123", "test.mp3");
 
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const fetchUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(fetchUrl).toMatch(/^\/api\/download\/123\?t=\d+$/);
+    expect(fetchSpy.mock.calls[0][1]).toEqual({ cache: "no-store" });
+    expect(createObjectUrlSpy).toHaveBeenCalledWith(fakeBlob);
     expect(click).toHaveBeenCalledTimes(1);
-    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledTimes(1);
 
-    vi.runAllTimers();
+    // Advance past the setTimeout to verify revoke is called
+    vi.advanceTimersByTime(10_000);
+    expect(revokeObjectUrlSpy).toHaveBeenCalledWith(fakeObjectUrl);
 
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:download-test");
+    vi.useRealTimers();
+  });
+
+  it("throws on non-ok response", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve("Not Found"),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:fake");
+
+    await expect(
+      downloadBlob("/api/download/123", "test.mp3"),
+    ).rejects.toThrow("Download failed (HTTP 404): Not Found");
   });
 });

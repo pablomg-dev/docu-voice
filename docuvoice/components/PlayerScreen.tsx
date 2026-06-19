@@ -23,7 +23,7 @@ export default function PlayerScreen({
   const [activeIndex, setActiveIndex] = useState(0)
   const playerRef = useRef<AudioPlayerHandle>(null)
 
-  const audioUrl = `/api/download/${sessionId}`
+  const audioUrl = `/api/download/${sessionId}?stream=1`
 
   const handleTimeUpdate = useCallback((_ms: number) => {
     // time is handled inside AudioPlayer for section sync

@@ -19,6 +19,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
   const { searchParams } = new URL(req.url)
   const sectionParam = searchParams.get('section')
+  const isStream = searchParams.has('stream')
 
   // ── Individual section download ──────────────────────────────────────────
   if (sectionParam !== null) {
@@ -41,16 +42,20 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       `section-${sectionIndex}-${section.type}`
     )
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': String(timeline.sectionMp3s[sectionIndex].length),
+    }
+    if (!isStream) {
+      headers['Content-Disposition'] = `attachment; filename="${filename}"`
+    }
+
     return new Response(new Uint8Array(timeline.sectionMp3s[sectionIndex]), {
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': String(timeline.sectionMp3s[sectionIndex].length),
-      },
+      headers,
     })
   }
 
-  // ── Full audio download ──────────────────────────────────────────────────
+  // ── Full audio ───────────────────────────────────────────────────────────
   const filename = deriveFilename(timeline.title)
   const fullMp3 = timeline.fullMp3
   const fileSize = fullMp3.length
@@ -63,24 +68,32 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const chunksize = (end - start) + 1
     const file = fullMp3.subarray(start, end + 1)
 
+    const headers: Record<string, string> = {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': String(chunksize),
+    }
+    if (!isStream) {
+      headers['Content-Disposition'] = `attachment; filename="${filename}"`
+    }
+
     return new Response(new Uint8Array(file), {
       status: 206,
-      headers: {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': String(chunksize),
-        'Content-Type': 'audio/mpeg',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
+      headers,
     })
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'audio/mpeg',
+    'Content-Length': String(fileSize),
+    'Accept-Ranges': 'bytes',
+  }
+  if (!isStream) {
+    headers['Content-Disposition'] = `attachment; filename="${filename}"`
+  }
+
   return new Response(new Uint8Array(fullMp3), {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(fileSize),
-      'Accept-Ranges': 'bytes',
-    },
+    headers,
   })
 }
