@@ -12,7 +12,7 @@ interface RouteParams {
  */
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { sessionId } = await params
-  const timeline = storeGet(sessionId)
+  const timeline = await storeGet(sessionId)
 
   if (!timeline) {
     return new Response(
@@ -33,8 +33,6 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       endTimestamp: s.endTimestamp,
     })),
   };
-
-  console.log('API Session Response:', JSON.stringify(responseData.sections.map(s => ({ i: s.index, start: s.startTimestamp })), null, 2));
 
   return Response.json(responseData)
 }

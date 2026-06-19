@@ -8,7 +8,7 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const { sessionId } = await params
-  const timeline = storeGet(sessionId)
+  const timeline = await storeGet(sessionId)
 
   if (!timeline) {
     return new Response(
