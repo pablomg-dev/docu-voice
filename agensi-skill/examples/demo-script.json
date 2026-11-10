@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "voice_mode": "single",
+  "multi_voice": false,
+  "spoken_chars": 652,
+  "section_count": 5,
+  "limits": {
+    "max_sections": 5,
+    "max_section_chars": 480,
+    "max_total_chars": 1800,
+    "min_total_chars": 80
+  },
+  "sections": [
+    {
+      "index": 1,
+      "role": "intro",
+      "title": "DocuVoice",
+      "text": "DocuVoice. Turn any documentation into a multi-voice audio podcast. Built with Kiro spec-driven development + ElevenLabs APIs for ElevenHacks 5.",
+      "chars": 144
+    },
+    {
+      "index": 2,
+      "role": "overview",
+      "title": "What it does",
+      "text": "What it does. Paste any GitHub README URL and DocuVoice generates a navigable audio podcast with different voices per section type.",
+      "chars": 131
+    },
+    {
+      "index": 3,
+      "role": "other",
+      "title": "Tech Stack",
+      "text": "Tech Stack. Next.js 16 + TypeScript. ElevenLabs TTS, Sound Effects and Music APIs. ffmpeg for audio assembly.",
+      "chars": 109
+    },
+    {
+      "index": 4,
+      "role": "other",
+      "title": "Run locally",
+      "text": "Run locally. Code samples are left out of this narration.",
+      "chars": 57
+    },
+    {
+      "index": 5,
+      "role": "other",
+      "title": "Built with Kiro spec-driven development",
+      "text": "Built with Kiro spec-driven development. Requirements, design and tasks were all defined as specs first, then implemented by Kiro's AI agent. See .kiro/specs/ for the full specification. ElevenHacks CodeWithKiro",
+      "chars": 211
+    }
+  ],
+  "source_url": "https://github.com/pablomg-dev/docu-voice"
+}

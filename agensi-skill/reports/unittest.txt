@@ -1,0 +1,34 @@
+test_blockquote_lists_and_emoji_are_spoken_cleanly (tests.test_build_script.BuildScriptTests.test_blockquote_lists_and_emoji_are_spoken_cleanly) ... ok
+test_cli_refuses_repo_output (tests.test_build_script.BuildScriptTests.test_cli_refuses_repo_output) ... ok
+test_cli_writes_temp_json (tests.test_build_script.BuildScriptTests.test_cli_writes_temp_json) ... ok
+test_code_and_secrets_are_not_spoken (tests.test_build_script.BuildScriptTests.test_code_and_secrets_are_not_spoken) ... ok
+test_long_section_is_capped (tests.test_build_script.BuildScriptTests.test_long_section_is_capped) ... ok
+test_sample_sections_skip_license_and_stay_single_voice (tests.test_build_script.BuildScriptTests.test_sample_sections_skip_license_and_stay_single_voice) ... ok
+test_short_readme_is_rejected (tests.test_build_script.BuildScriptTests.test_short_readme_is_rejected) ... ok
+test_removes_named_temp_dir_only (tests.test_concat_and_cleanup.CleanupTests.test_removes_named_temp_dir_only) ... ok
+test_joins_two_tones_into_a_valid_mp3 (tests.test_concat_and_cleanup.ConcatTests.test_joins_two_tones_into_a_valid_mp3) ... ok
+test_missing_ffmpeg_exits_3 (tests.test_concat_and_cleanup.ConcatTests.test_missing_ffmpeg_exits_3) ... ok
+test_rejects_missing_text_and_existing_output (tests.test_concat_and_cleanup.ConcatTests.test_rejects_missing_text_and_existing_output) ... ok
+test_refuses_final_url_on_a_private_host (tests.test_download_audio.DownloadTests.test_refuses_final_url_on_a_private_host) ... ok
+test_rejects_html_and_oversize_and_http_error (tests.test_download_audio.DownloadTests.test_rejects_html_and_oversize_and_http_error) ... ok
+test_saves_audio_bytes_under_temp (tests.test_download_audio.DownloadTests.test_saves_audio_bytes_under_temp) ... ok
+test_rejects_private_and_insecure_urls (tests.test_download_audio.UrlGuardTests.test_rejects_private_and_insecure_urls) ... ok
+test_rejects_public_name_that_resolves_privately (tests.test_download_audio.UrlGuardTests.test_rejects_public_name_that_resolves_privately) ... ok
+test_cli_prints_json (tests.test_fetch_readme.CliRoundTripTests.test_cli_prints_json) ... ok
+test_cli_error_json (tests.test_fetch_readme.FetchTests.test_cli_error_json) ... ok
+test_http_html_empty_and_oversize (tests.test_fetch_readme.FetchTests.test_http_html_empty_and_oversize) ... ok
+test_refuses_output_outside_temp (tests.test_fetch_readme.FetchTests.test_refuses_output_outside_temp) ... ok
+test_writes_readme_and_falls_back_after_404 (tests.test_fetch_readme.FetchTests.test_writes_readme_and_falls_back_after_404) ... ok
+test_bare_repo_and_query_string (tests.test_fetch_readme.PlanTests.test_bare_repo_and_query_string) ... ok
+test_blob_readme_and_rejects_other_files (tests.test_fetch_readme.PlanTests.test_blob_readme_and_rejects_other_files) ... ok
+test_raw_readme (tests.test_fetch_readme.PlanTests.test_raw_readme) ... ok
+test_rejects_non_https_userinfo_and_other_hosts (tests.test_fetch_readme.PlanTests.test_rejects_non_https_userinfo_and_other_hosts) ... ok
+test_redirect_host_must_stay_on_github (tests.test_fetch_readme.RedirectGuardTests.test_redirect_host_must_stay_on_github) ... ok
+test_public_github_readme (tests.test_fetch_readme_live.LiveFetchTests.test_public_github_readme) ... ok
+test_fixture_becomes_one_mp3 (tests.test_pipeline_simulated.SimulatedPipelineTests.test_fixture_becomes_one_mp3) ... ok
+test_simulator_refuses_without_marker (tests.test_pipeline_simulated.SimulatedPipelineTests.test_simulator_refuses_without_marker) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 1.869s
+
+OK
