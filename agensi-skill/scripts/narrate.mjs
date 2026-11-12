@@ -445,22 +445,42 @@ async function concatMp3Bytes(parts, outputPath) {
   return writeFileEnsured(outputPath, Buffer.concat(parts));
 }
 
-async function concatenateMp3(parts, outputPath) {
-  if (!parts.length) throw new Error('No audio to assemble.');
-  if (parts.length === 1) {
-    return { assembly: 'single', outputPath: await writeFileEnsured(outputPath, parts[0]) };
+async function concatenateMp3(speechParts, outputPath, sfxAudio = null) {
+  if (!speechParts.length) throw new Error('No audio to assemble.');
+  if (speechParts.length === 1) {
+    return {
+      assembly: 'single',
+      outputPath: await writeFileEnsured(outputPath, speechParts[0]),
+      sfxApplied: false,
+    };
   }
+
+  const useSfx = Boolean(sfxAudio);
+  const ffmpegParts = [];
+  for (let i = 0; i < speechParts.length; i += 1) {
+    ffmpegParts.push(speechParts[i]);
+    if (useSfx && i < speechParts.length - 1) ffmpegParts.push(sfxAudio);
+  }
+
   if (await ffmpegAvailable()) {
     try {
-      return { assembly: 'ffmpeg', outputPath: await concatWithFfmpeg(parts, outputPath) };
-    } catch (err) {
-      const message = err && err.message ? err.message : String(err);
-      console.error(`ffmpeg could not join the audio (${message}). Joining the MP3 bytes directly.`);
+      return {
+        assembly: 'ffmpeg',
+        outputPath: await concatWithFfmpeg(ffmpegParts, outputPath),
+        sfxApplied: useSfx,
+      };
+    } catch {
+      // Stereo SFX + mono TTS breaks many players if we fall back to byte-concat.
+      console.error('ffmpeg join failed, skipping transition sounds');
     }
   } else {
     console.error('ffmpeg is not on PATH. Joining the MP3 bytes directly.');
   }
-  return { assembly: 'bytes', outputPath: await concatMp3Bytes(parts, outputPath) };
+  return {
+    assembly: 'bytes',
+    outputPath: await concatMp3Bytes(speechParts, outputPath),
+    sfxApplied: false,
+  };
 }
 
 function formatReport(timeline, timelinePath) {
@@ -511,9 +531,8 @@ async function main(argv) {
   let sfxAudio = null;
   let wantSfx = args.sfx && spoken.length > 1;
   if (wantSfx && !(await ffmpegAvailable())) {
-    // Byte-concat cannot normalize stereo SFX onto mono TTS; skip rather than
-    // ship a file that stops at the first transition in common players.
-    console.error('sin ffmpeg, se omiten las transiciones');
+    // Byte-concat cannot normalize stereo SFX onto mono TTS.
+    console.error('ffmpeg not found, skipping transition sounds');
     wantSfx = false;
   }
   if (wantSfx) {
@@ -521,13 +540,8 @@ async function main(argv) {
     sfxAudio = await generateTransition(apiKey);
   }
 
-  const parts = [];
-  for (let i = 0; i < spoken.length; i += 1) {
-    parts.push(spoken[i].audio);
-    if (sfxAudio && i < spoken.length - 1) parts.push(sfxAudio);
-  }
-
-  const assembled = await concatenateMp3(parts, outPath);
+  const speechParts = spoken.map((section) => section.audio);
+  const assembled = await concatenateMp3(speechParts, outPath, sfxAudio);
   const characters = document.sections.reduce((sum, section) => sum + section.text.length, 0);
   const timeline = buildTimeline({
     title: document.title,
@@ -535,7 +549,7 @@ async function main(argv) {
     assembly: assembled.assembly,
     output: assembled.outputPath,
     characters,
-    sfxByteLength: sfxAudio ? sfxAudio.length : 0,
+    sfxByteLength: assembled.sfxApplied && sfxAudio ? sfxAudio.length : 0,
     sections: spoken.map((section) => ({
       index: section.index,
       title: section.title,

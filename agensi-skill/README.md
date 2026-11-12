@@ -20,7 +20,7 @@ examples/sample-sections.json
 
 - Node.js 18 or newer
 - An ElevenLabs API key in the environment variable `ELEVENLABS_API_KEY`
-- `ffmpeg` on `PATH` is optional. Without it, the script appends MP3 bytes directly.
+- `ffmpeg` on `PATH` is optional. Without it (or if it fails), transition sounds are skipped and the script appends MP3 bytes directly. Install `ffmpeg` to enable transitions.
 
 Copy `.env.example` only as a reminder of the variable name. The script does not read `.env` files. Put the key in the environment of the Node process. The script sends that key only as the `xi-api-key` header to `https://api.elevenlabs.io`.
 
