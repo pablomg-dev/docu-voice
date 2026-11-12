@@ -469,9 +469,10 @@ async function concatenateMp3(speechParts, outputPath, sfxAudio = null) {
         outputPath: await concatWithFfmpeg(ffmpegParts, outputPath),
         sfxApplied: useSfx,
       };
-    } catch {
+    } catch (err) {
       // Stereo SFX + mono TTS breaks many players if we fall back to byte-concat.
-      console.error('ffmpeg join failed, skipping transition sounds');
+      const detail = err && err.message ? err.message : String(err);
+      console.error(`ffmpeg join failed (${detail}), skipping transition sounds`);
     }
   } else {
     console.error('ffmpeg is not on PATH. Joining the MP3 bytes directly.');
