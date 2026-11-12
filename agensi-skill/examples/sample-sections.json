@@ -1,0 +1,29 @@
+{
+  "title": "Sample Project",
+  "sections": [
+    {
+      "index": 0,
+      "title": "Introduction",
+      "type": "introduction",
+      "text": "Sample Project is a tiny demo document for the DocuVoice narration script. It explains what the project does in a few spoken sentences."
+    },
+    {
+      "index": 1,
+      "title": "Install",
+      "type": "steps",
+      "text": "Install the project in three steps. First, clone the repository. Second, run npm install. Third, run npm run dev to start the local server."
+    },
+    {
+      "index": 2,
+      "title": "Configuration",
+      "type": "code",
+      "text": "The server port comes from the PORT setting and defaults to three thousand. Start the app with npm run dev after dependencies are installed."
+    },
+    {
+      "index": 3,
+      "title": "Caution",
+      "type": "warning",
+      "text": "Note: the free ElevenLabs plan includes ten thousand credits per month. A long document can use a large share of that allowance."
+    }
+  ]
+}
