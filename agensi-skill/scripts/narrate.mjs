@@ -400,9 +400,31 @@ async function concatWithFfmpeg(parts, outputPath) {
     }
     await fs.writeFile(path.join(dir, 'list.txt'), `${lines.join('\n')}\n`, 'utf8');
     try {
+      // Re-encode to mono: ElevenLabs SFX is stereo; TTS is mono. Stream-copy
+      // leaves a channel break that many players stop on at the first SFX.
       await execFileAsync(
         'ffmpeg',
-        ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-i', 'list.txt', '-c', 'copy', 'joined.mp3'],
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-y',
+          '-f',
+          'concat',
+          '-safe',
+          '0',
+          '-i',
+          'list.txt',
+          '-c:a',
+          'libmp3lame',
+          '-ar',
+          '44100',
+          '-ac',
+          '1',
+          '-b:a',
+          '128k',
+          'joined.mp3',
+        ],
         { cwd: dir, timeout: 120000, encoding: 'utf8', maxBuffer: 1024 * 1024 }
       );
     } catch (err) {
@@ -487,7 +509,14 @@ async function main(argv) {
   }
 
   let sfxAudio = null;
-  if (args.sfx && spoken.length > 1) {
+  let wantSfx = args.sfx && spoken.length > 1;
+  if (wantSfx && !(await ffmpegAvailable())) {
+    // Byte-concat cannot normalize stereo SFX onto mono TTS; skip rather than
+    // ship a file that stops at the first transition in common players.
+    console.error('sin ffmpeg, se omiten las transiciones');
+    wantSfx = false;
+  }
+  if (wantSfx) {
     console.error('Requesting a transition sound.');
     sfxAudio = await generateTransition(apiKey);
   }

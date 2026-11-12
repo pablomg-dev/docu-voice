@@ -1,0 +1,5 @@
+# Local narrate test outputs — keep out of git and skill ZIPs
+podcast*.mp3
+*.timeline.json
+diag-*
+slice*.wav
