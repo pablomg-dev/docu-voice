@@ -25,6 +25,10 @@ echo "ELEVENLABS_API_KEY=your_key" > .env.local
 npm run dev
 ```
 
+## Agensi skill
+
+The same narration flow is packaged for the [Agensi](https://www.agensi.io) marketplace in [`agensi-skill/`](agensi-skill/). It is instructions plus a zero-dependency Node script. The Next.js app in `docuvoice/` is unchanged.
+
 ## Built with Kiro spec-driven development
 
 Requirements, design and tasks were all defined as specs first, then implemented by Kiro's AI agent. See `.kiro/specs/` for the full specification.
