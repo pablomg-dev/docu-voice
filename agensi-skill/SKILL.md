@@ -64,7 +64,7 @@ Ask the user for an ElevenLabs API key only when `ELEVENLABS_API_KEY` is missing
 
 - Node.js 18 or newer (`node` on `PATH`)
 - `ELEVENLABS_API_KEY` for the Node process
-- Optional: `ffmpeg` on `PATH` for a cleaner join between sections
+- Optional: `ffmpeg` on `PATH`. Without it (or if it fails), transition sounds are skipped and sections are byte-joined. Install `ffmpeg` to enable transitions and a re-encoded mono join.
 
 ## 1. Get the document
 
@@ -207,7 +207,7 @@ node narrate.mjs /absolute/path/sections.json --mode multi --sfx on --out /absol
 
 The script prints the MP3 path, the timeline path, the mode, how the audio was joined, the character count, and each section as `start ms | type | voice | title`. The timeline file sits beside the MP3 and is named `<basename>.timeline.json`. Its `sections` array has `title`, `voice`, and `startMs`. `startMs` is estimated from MP3 size at 128 kbps (16,000 bytes per second), the same estimate DocuVoice uses. It is not a decoded duration.
 
-`Assembly: ffmpeg` means `ffmpeg` joined the parts. `Assembly: bytes` means `ffmpeg` was missing or could not join, and the MP3 frames were appended. `Assembly: single` means there was only one audio piece. If the join was `bytes`, tell the user that installing `ffmpeg` from their operating system package manager makes later joins cleaner.
+`Assembly: ffmpeg` means `ffmpeg` joined the parts (and re-encoded them to mono so stereo transition sounds play cleanly). `Assembly: bytes` means `ffmpeg` was missing or could not join, so MP3 frames were appended and transition sounds were omitted. `Assembly: single` means there was only one audio piece. If the join was `bytes`, tell the user that installing `ffmpeg` from their operating system package manager enables transition sounds and cleaner joins.
 
 ## 6. Report the result
 
