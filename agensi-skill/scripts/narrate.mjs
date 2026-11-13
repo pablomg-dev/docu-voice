@@ -2,9 +2,17 @@
 /**
  * Narrate a sections JSON file to a local MP3 with ElevenLabs.
  *
- * API key: process.env.ELEVENLABS_API_KEY only. It is sent as the xi-api-key
- * header to https://api.elevenlabs.io and nowhere else.
- * Local read: the sections JSON path given on the command line.
+ * Two execution modes:
+ * 1. Assembly mode (`--assemble <manifest.json>`): joins pre-generated local MP3 clips
+ *    (for example from Agensi's elevenlabs:text-to-speech tool) into the final MP3 and
+ *    writes the timeline JSON. Requires no API key and makes no network requests.
+ * 2. Direct BYOK mode (`<sections.json>`): reads process.env.ELEVENLABS_API_KEY only,
+ *    sends it as the xi-api-key header to https://api.elevenlabs.io and nowhere else.
+ *
+ * Helper mode (`--split <sections.json> [--max-chars 5000] [--out <chunked.json>]`):
+ *    splits sections exceeding the tool's 5,000-character limit into chunks <= maxChars.
+ *
+ * Local read: the sections/manifest JSON path (and local MP3 files in --assemble mode).
  * Local write: the MP3, a timeline JSON beside it, and temp audio under os.tmpdir().
  * ffmpeg is optional. When it is on PATH it is started with execFile and an argument list.
  */
@@ -20,16 +28,18 @@ const execFileAsync = promisify(execFile);
 
 const ELEVENLABS_ORIGIN = 'https://api.elevenlabs.io';
 const TTS_MODEL = 'eleven_turbo_v2_5';
+const AGENSI_TTS_MODEL = 'eleven_v4';
 const OUTPUT_FORMAT = 'mp3_44100_128';
 const SFX_PROMPT = 'subtle whoosh chime transition';
 const SFX_SECONDS = 2;
 const BYTES_PER_SECOND = 16000;
 const MAX_SECTION_CHARS = 40000;
+const AGENSI_MAX_CHARS = 5000;
 const MAX_SECTIONS = 50;
 const MAX_JSON_BYTES = 2_000_000;
 const REQUEST_TIMEOUT_MS = 90_000;
 
-// Public ElevenLabs premade voice ids. Catalog identifiers, not account keys.
+// Public ElevenLabs premade voice ids for direct BYOK API calls.
 const VOICE_MAP = {
   introduction: { name: 'Jessica', voiceId: 'cgSgspJ2msm6clMCkdW9' },
   code: { name: 'Adam', voiceId: 'pNInz6obpgDQGcFmaJgB' },
@@ -37,14 +47,26 @@ const VOICE_MAP = {
   steps: { name: 'Bella', voiceId: 'EXAVITQu4vr4xnSDxMaL' },
 };
 
+// Verified catalog voice ids present in Agensi's elevenlabs:voices catalog (no voice cloning).
+const AGENSI_VOICE_MAP = {
+  introduction: { name: 'Jessica', voiceId: 'cgSgspJ2msm6clMCkdW9' },
+  code: { name: 'Adam', voiceId: 'pNInz6obpgDQGcFmaJgB' },
+  warning: { name: 'Daniel', voiceId: 'onwK4e9ZLuTAKqWW03F9' },
+  steps: { name: 'Bella', voiceId: 'hpp4J3VqNfWAUOO0d1Us' },
+};
+
 const SINGLE_VOICE = VOICE_MAP.introduction;
 const SECTION_TYPES = new Set(['introduction', 'code', 'warning', 'steps']);
 
 const USAGE = [
-  'Usage: node narrate.mjs <sections.json> [--mode single|multi] [--sfx on|off] [--out podcast.mp3]',
+  'Usage:',
+  '  BYOK mode:     node narrate.mjs <sections.json> [--mode single|multi] [--sfx on|off] [--out podcast.mp3]',
+  '  Assemble mode: node narrate.mjs --assemble <manifest.json> [--mode single|multi] [--sfx on|off] [--out podcast.mp3]',
+  '  Split helper:  node narrate.mjs --split <sections.json> [--max-chars 5000] [--out chunked.json]',
   '',
-  'Reads ELEVENLABS_API_KEY from the environment and sends it only as the',
-  'xi-api-key header to https://api.elevenlabs.io.',
+  'In BYOK mode, reads ELEVENLABS_API_KEY from the environment and sends it only',
+  'as the xi-api-key header to https://api.elevenlabs.io.',
+  'In --assemble mode, joins pre-generated local MP3 clips without an API key or network calls.',
   'Writes an MP3 and a timeline JSON beside it. Does not upload the audio.',
 ].join('\n');
 
@@ -58,7 +80,8 @@ function readApiKey() {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (typeof apiKey !== 'string' || apiKey.trim() === '') {
     throw new Error(
-      'ELEVENLABS_API_KEY is not set. Add your ElevenLabs API key to the environment and run again. ' +
+      'ELEVENLABS_API_KEY is not set. Use Agensi tools (--assemble) to pay from your Agensi balance, ' +
+        'or add your ElevenLabs API key as ELEVENLABS_API_KEY in the environment and run again. ' +
         'The key is sent only as the xi-api-key header to https://api.elevenlabs.io and is not written to the MP3 or the timeline.'
     );
   }
@@ -68,9 +91,12 @@ function readApiKey() {
 function parseArgs(argv) {
   const args = {
     jsonPath: null,
+    assemblePath: null,
+    splitPath: null,
+    maxChars: AGENSI_MAX_CHARS,
     mode: 'multi',
     sfx: true,
-    out: 'podcast.mp3',
+    out: null,
     help: false,
   };
   const positional = [];
@@ -81,7 +107,14 @@ function parseArgs(argv) {
       args.help = true;
       continue;
     }
-    if (arg === '--mode' || arg === '--sfx' || arg === '--out') {
+    if (
+      arg === '--mode' ||
+      arg === '--sfx' ||
+      arg === '--out' ||
+      arg === '--assemble' ||
+      arg === '--split' ||
+      arg === '--max-chars'
+    ) {
       const value = argv[i + 1];
       if (!value || value.startsWith('--')) {
         throw new Error(`Expected a value after ${arg}.`);
@@ -97,6 +130,16 @@ function parseArgs(argv) {
           throw new Error('Expected --sfx on or --sfx off.');
         }
         args.sfx = value === 'on';
+      } else if (arg === '--assemble') {
+        args.assemblePath = value;
+      } else if (arg === '--split') {
+        args.splitPath = value;
+      } else if (arg === '--max-chars') {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 100 || parsed > MAX_SECTION_CHARS) {
+          throw new Error(`Expected --max-chars to be an integer between 100 and ${MAX_SECTION_CHARS}.`);
+        }
+        args.maxChars = parsed;
       } else {
         args.out = value;
       }
@@ -108,18 +151,104 @@ function parseArgs(argv) {
     positional.push(arg);
   }
 
+  if (args.assemblePath && args.splitPath) {
+    throw new Error('Use either --assemble or --split, not both.');
+  }
+  if ((args.assemblePath || args.splitPath) && positional.length > 0) {
+    throw new Error('Do not pass a positional sections file together with --assemble or --split.');
+  }
   if (positional.length > 1) {
     throw new Error('Pass one sections JSON path.');
   }
   args.jsonPath = positional[0] || null;
+  if (!args.splitPath && args.out === null) {
+    args.out = 'podcast.mp3';
+  }
   return args;
 }
 
-function voiceFor(type, mode) {
-  if (mode === 'single') return SINGLE_VOICE;
-  const voice = VOICE_MAP[type];
+function voiceFor(type, mode, catalog = 'byok') {
+  const map = catalog === 'agensi' ? AGENSI_VOICE_MAP : VOICE_MAP;
+  if (mode === 'single') return map.introduction;
+  const voice = map[type];
   if (!voice) throw new Error(`Unknown section type: ${type}`);
   return voice;
+}
+
+function splitTextIntoChunks(text, maxChars = AGENSI_MAX_CHARS) {
+  const clean = String(text ?? '').trim();
+  if (!clean) throw new Error('Cannot split empty text.');
+  if (!Number.isInteger(maxChars) || maxChars < 1) {
+    throw new Error('maxChars must be a positive integer.');
+  }
+  if (clean.length <= maxChars) return [clean];
+
+  const chunks = [];
+  let remaining = clean;
+
+  while (remaining.length > maxChars) {
+    const window = remaining.slice(0, maxChars + 1);
+    const minBreak = Math.floor(maxChars * 0.4);
+    let cut = -1;
+
+    const paraBreak = window.lastIndexOf('\n\n');
+    if (paraBreak >= minBreak) {
+      cut = paraBreak;
+    } else {
+      const lineBreak = window.lastIndexOf('\n');
+      if (lineBreak >= minBreak) {
+        cut = lineBreak;
+      } else {
+        for (const sep of ['. ', '! ', '? ', '; ']) {
+          const idx = window.lastIndexOf(sep);
+          if (idx >= minBreak && idx + 1 > cut) {
+            cut = idx + 1;
+          }
+        }
+        if (cut < 0) {
+          const spaceBreak = window.lastIndexOf(' ');
+          if (spaceBreak >= minBreak) cut = spaceBreak;
+        }
+      }
+    }
+
+    if (cut <= 0) cut = maxChars;
+    const part = remaining.slice(0, cut).trim();
+    if (part) chunks.push(part);
+    remaining = remaining.slice(cut).trim();
+  }
+
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+function splitDocumentForLimit(document, maxChars = AGENSI_MAX_CHARS) {
+  const chunked = [];
+  for (const section of document.sections) {
+    const parts = splitTextIntoChunks(section.text, maxChars);
+    if (parts.length === 1) {
+      chunked.push({ ...section, index: chunked.length });
+    } else {
+      for (let p = 0; p < parts.length; p += 1) {
+        const partTitle = p === 0 ? section.title : `${section.title}, part ${p + 1}`;
+        chunked.push({
+          index: chunked.length,
+          title: partTitle,
+          type: section.type,
+          text: parts[p],
+        });
+      }
+    }
+  }
+  if (chunked.length > MAX_SECTIONS) {
+    throw new Error(
+      `Splitting to ${maxChars} characters produced ${chunked.length} sections, exceeding the ${MAX_SECTIONS}-section limit.`
+    );
+  }
+  return {
+    title: document.title,
+    sections: chunked,
+  };
 }
 
 function estimateDurationMs(byteLength) {
@@ -330,7 +459,17 @@ async function generateTransition(apiKey) {
   }
 }
 
-function buildTimeline({ title, mode, assembly, output, characters, sfxByteLength, sections }) {
+function buildTimeline({
+  title,
+  model = TTS_MODEL,
+  provider = 'byok',
+  mode,
+  assembly,
+  output,
+  characters,
+  sfxByteLength,
+  sections,
+}) {
   let cursor = 0;
   const rows = [];
   for (let i = 0; i < sections.length; i += 1) {
@@ -352,7 +491,8 @@ function buildTimeline({ title, mode, assembly, output, characters, sfxByteLengt
   }
   return {
     title,
-    model: TTS_MODEL,
+    provider,
+    model,
     outputFormat: OUTPUT_FORMAT,
     mode,
     sfx: Boolean(sfxByteLength),
@@ -501,14 +641,194 @@ function formatReport(timeline, timelinePath) {
   return lines.join('\n');
 }
 
+async function readLocalMp3(filePath, label) {
+  if (typeof filePath !== 'string' || filePath.trim() === '') {
+    throw new Error(`${label} requires a local MP3 file path.`);
+  }
+  const resolved = path.resolve(filePath);
+  const data = await fs.readFile(resolved);
+  if (data.length === 0) {
+    throw new Error(`Audio file is empty: ${resolved}`);
+  }
+  return data;
+}
+
+async function loadAssembleManifest(manifestPath, cliMode) {
+  const resolved = path.resolve(manifestPath);
+  let stat;
+  try {
+    stat = await fs.stat(resolved);
+  } catch (err) {
+    if (err && err.code === 'ENOENT') {
+      throw new Error(`Manifest file not found: ${resolved}`);
+    }
+    throw err;
+  }
+  if (!stat.isFile()) {
+    throw new Error(`Manifest path is not a file: ${resolved}`);
+  }
+  if (stat.size > MAX_JSON_BYTES) {
+    throw new Error('The manifest file is larger than 2 MB.');
+  }
+  let raw = await fs.readFile(resolved, 'utf8');
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`Could not parse JSON in ${resolved}.`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Array.isArray(parsed.sections)) {
+    throw new Error('Assemble manifest must be a JSON object with a sections array.');
+  }
+  if (parsed.sections.length === 0) {
+    throw new Error('The manifest has no sections.');
+  }
+  if (parsed.sections.length > MAX_SECTIONS) {
+    throw new Error(`The manifest has ${parsed.sections.length} sections. Use ${MAX_SECTIONS} or fewer.`);
+  }
+
+  const mode = parsed.mode === 'single' || parsed.mode === 'multi' ? parsed.mode : cliMode;
+  const manifestDir = path.dirname(resolved);
+  const sections = [];
+
+  for (let i = 0; i < parsed.sections.length; i += 1) {
+    const entry = parsed.sections[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error(`Manifest section ${i} is not an object.`);
+    }
+    if (!SECTION_TYPES.has(entry.type)) {
+      throw new Error(
+        `Manifest section ${i} has type ${JSON.stringify(entry.type)}. Use introduction, code, warning, or steps.`
+      );
+    }
+    if (typeof entry.audioPath !== 'string' || entry.audioPath.trim() === '') {
+      throw new Error(`Manifest section ${i} needs a local audioPath.`);
+    }
+    const audioResolved = path.isAbsolute(entry.audioPath)
+      ? entry.audioPath
+      : path.resolve(manifestDir, entry.audioPath);
+    const audio = await readLocalMp3(audioResolved, `Manifest section ${i}`);
+    const defaultVoice = voiceFor(entry.type, mode, 'agensi');
+    const voiceName =
+      typeof entry.voice === 'string' && entry.voice.trim() ? entry.voice.trim() : defaultVoice.name;
+    const voiceId =
+      typeof entry.voiceId === 'string' && entry.voiceId.trim() ? entry.voiceId.trim() : defaultVoice.voiceId;
+    const title =
+      typeof entry.title === 'string' && entry.title.trim()
+        ? entry.title.trim().replace(/\s+/g, ' ')
+        : `Section ${i + 1}`;
+    const index = Number.isInteger(entry.index) && entry.index >= 0 ? entry.index : i;
+    const characters = Number.isInteger(entry.characters) && entry.characters >= 0
+      ? entry.characters
+      : typeof entry.text === 'string'
+        ? entry.text.trim().length
+        : 0;
+    sections.push({
+      index,
+      title,
+      type: entry.type,
+      voice: { name: voiceName, voiceId },
+      audio,
+      characters,
+    });
+  }
+
+  const givenTitle =
+    typeof parsed.title === 'string' && parsed.title.trim()
+      ? parsed.title.trim().replace(/\s+/g, ' ')
+      : '';
+  const sfxResolved =
+    typeof parsed.sfxPath === 'string' && parsed.sfxPath.trim()
+      ? path.isAbsolute(parsed.sfxPath)
+        ? parsed.sfxPath
+        : path.resolve(manifestDir, parsed.sfxPath)
+      : null;
+
+  return {
+    resolved,
+    manifest: {
+      title: givenTitle || sections[0].title,
+      model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : AGENSI_TTS_MODEL,
+      provider: typeof parsed.provider === 'string' && parsed.provider.trim() ? parsed.provider.trim() : 'agensi',
+      mode,
+      sfxPath: sfxResolved,
+      characters:
+        Number.isInteger(parsed.characters) && parsed.characters >= 0
+          ? parsed.characters
+          : sections.reduce((sum, s) => sum + s.characters, 0),
+      sections,
+    },
+  };
+}
+
 async function main(argv) {
   const args = parseArgs(argv);
   if (args.help) {
     console.log(USAGE);
     return;
   }
+
+  if (args.splitPath) {
+    const loaded = await loadSections(args.splitPath);
+    const splitDoc = splitDocumentForLimit(loaded.document, args.maxChars);
+    const jsonText = `${JSON.stringify(splitDoc, null, 2)}\n`;
+    if (args.out) {
+      const written = await writeFileEnsured(args.out, jsonText);
+      console.log(`Wrote: ${written}`);
+      console.log(`Sections: ${splitDoc.sections.length}`);
+    } else {
+      process.stdout.write(jsonText);
+    }
+    return;
+  }
+
+  if (args.assemblePath) {
+    const outPath = normalizeOutPath(args.out);
+    const loaded = await loadAssembleManifest(args.assemblePath, args.mode);
+    const timelinePath = timelinePathFor(outPath);
+    if (loaded.resolved === path.resolve(outPath) || loaded.resolved === timelinePath) {
+      throw new Error('Choose an --out path that does not overwrite the manifest file.');
+    }
+
+    const { manifest } = loaded;
+    let sfxAudio = null;
+    const wantSfx = args.sfx && manifest.sections.length > 1 && Boolean(manifest.sfxPath);
+    if (wantSfx) {
+      if (await ffmpegAvailable()) {
+        sfxAudio = await readLocalMp3(manifest.sfxPath, 'Transition SFX');
+      } else {
+        console.error('ffmpeg not found, skipping transition sounds');
+      }
+    }
+
+    const speechParts = manifest.sections.map((section) => section.audio);
+    const assembled = await concatenateMp3(speechParts, outPath, sfxAudio);
+    const timeline = buildTimeline({
+      title: manifest.title,
+      model: manifest.model,
+      provider: manifest.provider,
+      mode: manifest.mode,
+      assembly: assembled.assembly,
+      output: assembled.outputPath,
+      characters: manifest.characters,
+      sfxByteLength: assembled.sfxApplied && sfxAudio ? sfxAudio.length : 0,
+      sections: manifest.sections.map((section) => ({
+        index: section.index,
+        title: section.title,
+        type: section.type,
+        voiceName: section.voice.name,
+        voiceId: section.voice.voiceId,
+        byteLength: section.audio.length,
+      })),
+    });
+    const writtenTimeline = await writeFileEnsured(timelinePath, `${JSON.stringify(timeline, null, 2)}\n`);
+    console.log(formatReport(timeline, writtenTimeline));
+    return;
+  }
+
   if (!args.jsonPath) {
-    throw new Error(`Pass the path to a sections JSON file.\n\n${USAGE}`);
+    throw new Error(`Pass the path to a sections JSON file, or use --assemble / --split.\n\n${USAGE}`);
   }
 
   const apiKey = readApiKey();
@@ -523,7 +843,7 @@ async function main(argv) {
   const spoken = [];
   for (let i = 0; i < document.sections.length; i += 1) {
     const section = document.sections[i];
-    const voice = voiceFor(section.type, args.mode);
+    const voice = voiceFor(section.type, args.mode, 'byok');
     console.error(`Speaking ${i + 1}/${document.sections.length}: ${section.title} (${voice.name})`);
     const result = await generateSpeech(apiKey, section, args.mode);
     spoken.push({ ...section, voice: result.voice, audio: result.audio });
@@ -546,6 +866,8 @@ async function main(argv) {
   const characters = document.sections.reduce((sum, section) => sum + section.text.length, 0);
   const timeline = buildTimeline({
     title: document.title,
+    model: TTS_MODEL,
+    provider: 'byok',
     mode: args.mode,
     assembly: assembled.assembly,
     output: assembled.outputPath,
@@ -584,6 +906,9 @@ if (isDirectRun()) {
 export {
   parseArgs,
   voiceFor,
+  splitTextIntoChunks,
+  splitDocumentForLimit,
+  loadAssembleManifest,
   estimateDurationMs,
   parseSectionsDocument,
   loadSections,
@@ -593,8 +918,11 @@ export {
   concatWithFfmpeg,
   concatMp3Bytes,
   VOICE_MAP,
+  AGENSI_VOICE_MAP,
   SINGLE_VOICE,
   TTS_MODEL,
+  AGENSI_TTS_MODEL,
+  AGENSI_MAX_CHARS,
   OUTPUT_FORMAT,
   SFX_PROMPT,
 };
