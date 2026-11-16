@@ -136,8 +136,49 @@ export function add(a: number, b: number) { return a + b }
     assert.doesNotMatch(out, /title=/);
   });
 
+  it('protects HTML inside fenced code from document HTML stripping', () => {
+    const md = `# Examples
+
+\`\`\`html
+<script>alert("example")</script>
+<div>Example</div>
+\`\`\`
+
+\`\`\`js
+const html = '<div title="2 > 1">Safe</div>';
+if (x < 5) console.log(html);
+\`\`\`
+`;
+    const out = rewriteMarkdownSpeakable(md);
+    // Fenced HTML/JS must reach narrateCode (short → snippet), not be wiped as document HTML
+    assert.match(out, /short HTML snippet/i);
+    assert.match(out, /short JavaScript snippet/i);
+    assert.doesNotMatch(out, /<script>/i);
+    assert.doesNotMatch(out, /<div>/i);
+  });
+
+  it('preserves comparison operators in prose and strips real tags', () => {
+    const out = rewriteMarkdownSpeakable(
+      `# Compare\n\nUse x < 5 and a > b when filtering.\n\n<div title="2 > 1">Keep me</div>\n`
+    );
+    assert.match(out, /x < 5/);
+    assert.match(out, /a > b/);
+    assert.match(out, /Keep me/);
+    assert.doesNotMatch(out, /title=/);
+  });
+
   it('preserves plain prose READMEs', () => {
     const out = rewriteMarkdownSpeakable(`# Hello\n\nSimple project.\n`);
     assert.match(out, /Simple project/);
+  });
+});
+
+describe('htmlToSpeakable comparisons', () => {
+  it('does not treat x < 5 as a tag', () => {
+    assert.equal(htmlToSpeakable('Use x < 5 and a > b.'), 'Use x < 5 and a > b.');
+  });
+
+  it('does not treat TypeScript-like generics as tags', () => {
+    assert.equal(htmlToSpeakable('Returns Foo<T> and Bar<U, V>.'), 'Returns Foo<T> and Bar<U, V>.');
   });
 });

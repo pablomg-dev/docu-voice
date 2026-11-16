@@ -370,6 +370,13 @@ export function htmlToSpeakable(html) {
         continue;
       }
 
+      // Comparisons like `x < 5` are not tags — keep the `<` as text
+      if (!isHtmlTagOpen(s, i)) {
+        out += s[i];
+        i += 1;
+        continue;
+      }
+
       const isClose = s[i + 1] === '/';
       let j = i + (isClose ? 2 : 1);
       while (j < s.length && /[A-Za-z0-9:-]/.test(s[j])) j += 1;
@@ -485,6 +492,43 @@ function replaceImagesAndBadges(markdown) {
   return text;
 }
 
+/** Tag names treated as real HTML (plus custom elements with a hyphen). */
+const HTML_TAG_NAMES = new Set([
+  'a', 'abbr', 'address', 'area', 'article', 'aside', 'audio', 'b', 'base', 'bdi', 'bdo',
+  'blockquote', 'body', 'br', 'button', 'canvas', 'caption', 'cite', 'code', 'col', 'colgroup',
+  'data', 'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'div', 'dl', 'dt', 'em', 'embed',
+  'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label',
+  'legend', 'li', 'link', 'main', 'map', 'mark', 'menu', 'meta', 'meter', 'nav', 'noscript',
+  'object', 'ol', 'optgroup', 'option', 'output', 'p', 'param', 'picture', 'pre', 'progress', 'q',
+  'rp', 'rt', 'ruby', 's', 'samp', 'script', 'search', 'section', 'select', 'slot', 'small',
+  'source', 'span', 'strong', 'style', 'sub', 'summary', 'sup', 'svg', 'table', 'tbody', 'td',
+  'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'u', 'ul',
+  'var', 'video', 'wbr',
+]);
+
+/**
+ * True when `<` at index i begins a real HTML tag or comment (not `x < 5` / `Foo<T>`).
+ * Requires `<!--`, or `/`+known tag, or a known/custom-element tag name.
+ */
+function isHtmlTagOpen(s, i) {
+  if (s[i] !== '<' || i + 1 >= s.length) return false;
+  if (s.startsWith('<!--', i)) return true;
+  let j = i + 1;
+  if (s[j] === '/') j += 1;
+  if (j >= s.length || !/[A-Za-z]/.test(s[j])) return false;
+  const start = j;
+  while (j < s.length && /[A-Za-z0-9:-]/.test(s[j])) j += 1;
+  const name = s.slice(start, j).toLowerCase();
+  if (!name) return false;
+  // After the name, HTML allows only whitespace, attributes, `/`, or `>`
+  // Reject generics like `Bar<U, V>` where `,` follows the name
+  if (j < s.length && !/[\s\/>]/.test(s[j])) return false;
+  // Custom elements must contain a hyphen (HTML spec)
+  if (name.includes('-')) return true;
+  return HTML_TAG_NAMES.has(name);
+}
+
 /** Remove HTML tags with quote-aware scanning (never splits on `>` inside attributes). */
 function stripHtmlTagsAttributeAware(input) {
   const s = String(input);
@@ -496,6 +540,12 @@ function stripHtmlTagsAttributeAware(input) {
         const end = s.indexOf('-->', i + 4);
         i = end === -1 ? s.length : end + 3;
         out += ' ';
+        continue;
+      }
+      // Keep comparisons / generics: `x < 5`, `Foo<T>`
+      if (!isHtmlTagOpen(s, i)) {
+        out += s[i];
+        i += 1;
         continue;
       }
       let j = i + 1;
@@ -534,7 +584,9 @@ function stripHtmlTagsAttributeAware(input) {
  */
 export function rewriteMarkdownSpeakable(markdown) {
   let text = String(markdown).replace(/\r\n/g, '\n');
-  // HTML elements → visible text (attribute-safe via htmlToSpeakable)
+  // Fences first so HTML inside ```html / ```js examples is never treated as document HTML
+  text = replaceFencedBlocks(text);
+  // Document HTML → visible text (attribute-safe via htmlToSpeakable)
   text = text.replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, ' ');
   text = text.replace(
     /<(p|div|span|section|article|li|td|th|h[1-6]|em|strong|b|i|a)\b[\s\S]*?<\/\1>/gi,
@@ -543,9 +595,8 @@ export function rewriteMarkdownSpeakable(markdown) {
       return spoken ? ` ${spoken} ` : ' ';
     }
   );
-  // Stray tags (quote-aware; does not treat `>` inside attributes as tag end)
+  // Stray tags (quote-aware; ignores `x < 5` and similar non-tags)
   text = stripHtmlTagsAttributeAware(text);
-  text = replaceFencedBlocks(text);
   text = replaceImagesAndBadges(text);
   return `${text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
 }
