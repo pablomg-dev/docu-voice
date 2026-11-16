@@ -2,7 +2,7 @@
 name: "DocuVoice: README to Podcast"
 description: "Narrate a GitHub README, Markdown file, or pasted documentation as a local MP3 podcast. Classifies sections as introduction, code, warning, or steps, speaks them with ElevenLabs in one voice or four, and writes the audio plus a timeline. Uses Agensi's ElevenLabs tool by default (paid from your Agensi balance, no API key required), with your own ELEVENLABS_API_KEY as an optional fallback."
 summary: "Turns a README or Markdown document into a local multi-voice MP3 using Agensi's ElevenLabs tool (no key required) or your own ElevenLabs API key."
-version: "1.2.0"
+version: "1.3.0"
 tags:
   - documentation
   - podcast
@@ -135,17 +135,25 @@ A section that contains a code block stays `code` even if it also contains a not
 
 ## 3. Write speakable text and keep the language
 
-Build `text` only after the type is chosen.
+**Prefer the deterministic rewriter** before you invent phrasing by hand:
 
-- Remove HTML comments, HTML tags, and Markdown images, including status badges.
-- Replace a Markdown link with its visible label and drop the URL.
-- Drop bare URLs.
-- Turn leftover entities `&amp;`, `&lt;`, `&gt;`, `&quot;`, and `&#39;` into `&`, `<`, `>`, `"`, and `'`.
+```bash
+node scripts/speakable.mjs --rewrite /path/to/source.md --out /path/to/source.speakable.md
+```
+
+`scripts/speakable.mjs` (zero npm dependencies, no LLM, no network) turns Mermaid fences, code fences, images, badge rows, and HTML into short podcast prose while keeping headings for classification. It matches the web app’s `docuvoice/lib/speakable.ts` behavior. Use the rewritten file as the source for section `text` below. If you cannot run the script, apply the same rules manually.
+
+Build each section’s `text` only after the type is chosen.
+
+- Do **not** narrate Mermaid syntax literally; summarize nodes and flows (or use the script output).
+- Do **not** read code line by line; give 1–3 sentences (language, purpose, key commands/names).
+- For images: speak useful `alt` text only; omit empty, URL-only, or filename-only alts. No vision.
+- For badges (shields.io and similar): group consecutive badges briefly; never speak badge URLs.
+- For HTML: narrate visible text only; never speak attributes, classes, IDs, scripts, or styles; never execute HTML/JS.
+- Replace a Markdown link with its visible label and drop the URL. Drop bare URLs.
 - If nothing speakable remains, use the section title.
-- Start each section's `text` with a short spoken heading taken from the title, so the listener hears the section change.
+- Start each section’s `text` with a short spoken heading taken from the title, so the listener hears the section change.
 - Keep the language of the source. Do not translate.
-
-For `code`, do not read the source character by character and do not put the raw source in `text`. Turn each code block into one to three sentences: what it does, then any command as words a person can recognize ("Run npm install"). Mention setting names and the values that matter. Skip braces, semicolons, and indentation.
 
 For `steps`, speak the items in order ("First, ... Second, ...") and keep commands recognizable.
 

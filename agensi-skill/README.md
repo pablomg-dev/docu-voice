@@ -12,10 +12,11 @@ README.md
 CHANGELOG.md
 .env.example
 scripts/narrate.mjs
+scripts/speakable.mjs
 examples/sample-sections.json
 ```
 
-`SKILL.md` is the agent instructions. `scripts/narrate.mjs` is a Node 18+ script with zero npm dependencies.
+`SKILL.md` is the agent instructions. `scripts/narrate.mjs` and `scripts/speakable.mjs` are Node 18+ scripts with zero npm dependencies.
 
 ## How narration & payment work
 
@@ -62,6 +63,16 @@ The command writes `podcast.mp3` and `podcast.timeline.json` in the current dire
 ### Optional source traceability (v1.2+)
 
 `examples/sample-sections.json` shows an optional top-level `source` object (`url`, `repo`, `ref`, `commitSha`, `path`) plus per-section `headingLevel`, `anchor`, and `sourceUrl`. The CLI copies these into the timeline when present. It never calls GitHub — omit `source` for pasted docs or when you have not pinned a commit.
+
+### Speakable rewrite (v1.3+)
+
+Before classifying sections, rewrite Mermaid, code, images, badges, and HTML into podcast prose:
+
+```bash
+node scripts/speakable.mjs --rewrite readme.md --out readme.speakable.md
+```
+
+No API keys, no LLM, no network. Then build `sections.json` from the rewritten Markdown and pass it to `narrate.mjs` / Agensi assemble as usual.
 
 Check syntax without calling any API:
 
