@@ -27,7 +27,7 @@ npm run dev
 
 ## Agensi skill
 
-The same narration flow is packaged for the [Agensi](https://www.agensi.io) marketplace in [`agensi-skill/`](agensi-skill/). It is instructions plus a zero-dependency Node script. The Next.js app in `docuvoice/` is unchanged.
+The same narration flow is packaged for the [Agensi](https://www.agensi.io/skills/docuvoice-readme-to-podcast) marketplace in [`agensi-skill/`](agensi-skill/). It is instructions plus a zero-dependency Node script. When used through an Agensi-connected agent, it runs on Agensi's ElevenLabs tools (paid from your Agensi balance—no ElevenLabs API key required), with your own `ELEVENLABS_API_KEY` supported as an alternative. The Next.js app in `docuvoice/` is unchanged.
 
 ## Built with Kiro spec-driven development
 

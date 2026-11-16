@@ -1,5 +1,16 @@
 import { NextRequest } from 'next/server'
-import { fetchContent, InvalidUrlError, HttpError, TimeoutError, NetworkError } from '@/lib/contentFetcher'
+import {
+  fetchContent,
+  InvalidUrlError,
+  HttpError,
+  TimeoutError,
+  NetworkError,
+  GitHubRepoNotFoundError,
+  GitHubReadmeNotFoundError,
+  GitHubRateLimitError,
+  GitHubAuthError,
+  GitHubApiError,
+} from '@/lib/contentFetcher'
 import { parse, ParseError } from '@/lib/parser'
 import { generateAll } from '@/lib/ttsEngine'
 import { generateTransitions } from '@/lib/sfxEngine'
@@ -7,7 +18,7 @@ import { assemble } from '@/lib/audioAssembler'
 import { set as storeSet } from '@/lib/sessionStore'
 import { looksLikeSpanish } from '@/lib/voiceMap'
 import type { VoiceMode } from '@/lib/voiceMap'
-import type { ProgressEvent, ProcessingStep } from '@/types'
+import type { ProgressEvent, ProcessingStep, SourceMetadata } from '@/types'
 
 const MIN_TEXT_LENGTH = 100
 
@@ -80,14 +91,31 @@ export async function POST(req: NextRequest) {
 
         let rawContent: string
         let docTitle = 'DocuVoice Audio'
+        let source: SourceMetadata | undefined
 
         if (url) {
           try {
             const result = await fetchContent(url)
             rawContent = result.content
+            source = result.source
           } catch (err) {
             if (err instanceof InvalidUrlError) {
               return emitError('parsing', `Invalid URL: ${(err as Error).message}`)
+            }
+            if (err instanceof GitHubRepoNotFoundError) {
+              return emitError('parsing', 'GitHub repository not found.')
+            }
+            if (err instanceof GitHubReadmeNotFoundError) {
+              return emitError('parsing', 'No README found in that repository.')
+            }
+            if (err instanceof GitHubRateLimitError) {
+              return emitError('parsing', 'GitHub API rate limit exceeded. Try again later.')
+            }
+            if (err instanceof GitHubAuthError) {
+              return emitError('parsing', 'No access to that GitHub repository (private or forbidden).')
+            }
+            if (err instanceof GitHubApiError) {
+              return emitError('parsing', `GitHub API error: ${(err as Error).message}`)
             }
             if (err instanceof HttpError) {
               return emitError('parsing', `Could not reach the URL (HTTP ${(err as HttpError).statusCode}).`)
@@ -106,7 +134,7 @@ export async function POST(req: NextRequest) {
 
         let sections
         try {
-          sections = await parse(rawContent)
+          sections = await parse(rawContent, source ? { source } : undefined)
         } catch (err) {
           if (err instanceof ParseError) {
             return emitError('parsing', err.message)
@@ -158,6 +186,7 @@ export async function POST(req: NextRequest) {
           transitions,
           backgroundMusic: undefined,
           title: docTitle,
+          source,
         })
 
         storeSet(timeline.sessionId, timeline)

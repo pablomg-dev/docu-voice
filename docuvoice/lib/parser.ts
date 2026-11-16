@@ -3,8 +3,10 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
-import type { Root, Content, Heading, Code, Blockquote, List } from 'mdast'
-import type { SectionType, Section } from '@/types'
+import GithubSlugger from 'github-slugger'
+import type { Root, Content, Heading } from 'mdast'
+import type { SectionType, Section, SourceMetadata } from '@/types'
+import { attachSectionSourceUrls } from '@/lib/githubSource'
 
 const MIN_SECTIONS = 1
 
@@ -76,6 +78,11 @@ function classifyNode(node: Content): SectionType | null {
   }
 }
 
+export interface ParseOptions {
+  /** When set, each section gets a permalink sourceUrl for that revision. */
+  source?: SourceMetadata
+}
+
 // ─── Main parser ──────────────────────────────────────────────────────────────
 
 /**
@@ -86,29 +93,50 @@ function classifyNode(node: Content): SectionType | null {
  * - Each heading starts a new section (title = heading text).
  * - Non-heading nodes are accumulated into the current section.
  * - The section type is determined by the dominant node type within it.
+ * - Every heading advances github-slugger in document order — including
+ *   empty headings that are later discarded — so kept sections get the
+ *   same anchors GitHub would assign.
+ * - Preamble (Introduction) has headingLevel/anchor null.
  * - Throws ParseError if fewer than MIN_SECTIONS sections are produced.
  */
-export async function parse(rawText: string): Promise<Section[]> {
+export async function parse(rawText: string, options?: ParseOptions): Promise<Section[]> {
   const processor = unified().use(remarkParse)
   const tree = processor.parse(rawText) as Root
+  const slugger = new GithubSlugger()
 
   interface RawSection {
     title: string
     nodes: Content[]
+    headingLevel: number | null
+    /** Precomputed GitHub slug; null for preamble. */
+    anchor: string | null
   }
 
   const rawSections: RawSection[] = []
-  let current: RawSection = { title: 'Introduction', nodes: [] }
+  let current: RawSection = {
+    title: 'Introduction',
+    nodes: [],
+    headingLevel: null,
+    anchor: null,
+  }
 
   for (const node of tree.children) {
     if (node.type === 'heading') {
+      const heading = node as Heading
       // Flush current section if it has content
       if (current.nodes.length > 0) {
         rawSections.push(current)
       }
+      const headingText = extractText(heading as unknown as Content)
+      const title = headingText.trim() || 'Section'
+      // Advance slugger for every heading in order, even if this section is
+      // later discarded for having no body before the next heading.
+      const anchor = slugger.slug(headingText)
       current = {
-        title: extractText(node as unknown as Content).trim() || 'Section',
+        title,
         nodes: [],
+        headingLevel: heading.depth,
+        anchor,
       }
     } else {
       current.nodes.push(node as Content)
@@ -127,7 +155,7 @@ export async function parse(rawText: string): Promise<Section[]> {
     )
   }
 
-  // Build Section objects
+  // Build Section objects from kept sections (anchors already assigned).
   const sections: Section[] = []
 
   for (let i = 0; i < rawSections.length; i++) {
@@ -154,7 +182,14 @@ export async function parse(rawText: string): Promise<Section[]> {
       title: raw.title,
       type,
       text: text || raw.title,
+      headingLevel: raw.headingLevel,
+      anchor: raw.anchor,
+      sourceUrl: null,
     })
+  }
+
+  if (options?.source) {
+    return attachSectionSourceUrls(sections, options.source)
   }
 
   return sections

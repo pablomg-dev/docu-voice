@@ -24,6 +24,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   const responseData = {
     sessionId: timeline.sessionId,
     title: timeline.title,
+    ...(timeline.source ? { source: timeline.source } : {}),
     sections: timeline.sections.map((s) => ({
       index: s.index,
       title: s.title,
@@ -31,8 +32,11 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       text: s.text,
       startTimestamp: s.startTimestamp,
       endTimestamp: s.endTimestamp,
+      headingLevel: s.headingLevel ?? null,
+      anchor: s.anchor ?? null,
+      sourceUrl: s.sourceUrl ?? null,
     })),
-  };
+  }
 
   return Response.json(responseData)
 }
