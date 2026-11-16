@@ -2,6 +2,16 @@
 
 All notable changes to the `DocuVoice: README to Podcast` Agensi skill are documented in this file.
 
+## [1.3.0] - 2026-11-16
+
+### Added
+- **Deterministic speakable rewriter:** `scripts/speakable.mjs` (zero npm dependencies) summarizes Mermaid diagrams, code fences, image alts, badge rows, and visible HTML into podcast-ready prose — aligned with `docuvoice/lib/speakable.ts`.
+- CLI: `node scripts/speakable.mjs --rewrite <input.md> [--out <file>]`.
+- Unit tests in `scripts/speakable.test.mjs` for Mermaid, code, images/badges, HTML (including attribute `>` and single-pass entities), and full Markdown rewrite.
+
+### Changed
+- `SKILL.md` now instructs agents to run the speakable rewriter before building section `text` (manual fallback rules kept when the script cannot run).
+
 ## [1.2.0] - 2026-11-16
 
 ### Added
