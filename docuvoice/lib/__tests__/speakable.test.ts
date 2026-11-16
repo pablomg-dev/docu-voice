@@ -161,13 +161,21 @@ describe('htmlToSpeakable', () => {
     expect(htmlToSpeakable('<div title="2 > 1">Visible</div>')).not.toMatch(/>|title=/)
   })
 
-  it('handles nested tags, entities, noscript/template, and malformed HTML', () => {
+  it('handles nested tags, noscript/template, and malformed HTML', () => {
     expect(htmlToSpeakable('<div><p>Outer <em>inner</em></p></div>')).toBe('Outer inner')
-    expect(htmlToSpeakable('<p>Tom &amp; Jerry &lt;3</p>')).toMatch(/Tom & Jerry/)
     expect(htmlToSpeakable('<noscript>Hidden</noscript><p>Shown</p>')).toBe('Shown')
     expect(htmlToSpeakable('<template><p>Nope</p></template><span>Yes</span>')).toBe('Yes')
     // Malformed: parser recovers without speaking attribute fragments
     expect(htmlToSpeakable('<div title="oops>still">Recovered</div>')).toBe('Recovered')
+  })
+
+  it('decodes HTML entities only once (rehype-parse, no double decode)', () => {
+    expect(htmlToSpeakable('<p>&amp;amp;</p>')).toBe('&amp;')
+    expect(htmlToSpeakable('<p>&amp;</p>')).toBe('&')
+    expect(htmlToSpeakable('<p>&lt;tag&gt;</p>')).toBe('<tag>')
+    expect(htmlToSpeakable('<p>&#38;#38;</p>')).toBe('&#38;')
+    expect(htmlToSpeakable('<p>&#x26;amp;</p>')).toBe('&amp;')
+    expect(htmlToSpeakable('<p>Tom &amp; Jerry &lt;3</p>')).toBe('Tom & Jerry <3')
   })
 
   it('handles inline HTML mixed with markdown via the parser', async () => {

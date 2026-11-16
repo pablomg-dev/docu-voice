@@ -60,16 +60,6 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-}
-
 /** True when alt is worth speaking (not empty, not a bare URL/filename). */
 export function isUsefulAlt(alt: string | null | undefined, url?: string | null): boolean {
   const value = (alt ?? '').trim()
@@ -408,8 +398,9 @@ export function htmlToSpeakable(html: string): string {
       .use(rehypeParse, { fragment: true })
       .parse(html) as HastRoot
     stripHiddenHast(tree)
-    // toText walks the AST — attributes are never included
-    return collapseWhitespace(decodeEntities(toText(tree)))
+    // toText walks the AST — attributes are never included.
+    // Do not decodeEntities() here: rehype-parse already decodes once.
+    return collapseWhitespace(toText(tree))
   } catch {
     // Malformed input: fail closed to empty rather than leaking markup
     return ''
