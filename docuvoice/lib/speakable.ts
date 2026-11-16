@@ -1,3 +1,7 @@
+import { unified } from 'unified'
+import rehypeParse from 'rehype-parse'
+import { toText } from 'hast-util-to-text'
+import type { Root as HastRoot, Element as HastElement, Nodes as HastNodes } from 'hast'
 import type { Content, Root, PhrasingContent, Code, Image, Html, Link, Paragraph } from 'mdast'
 
 const BADGE_HOST_RE =
@@ -196,8 +200,10 @@ export function narrateMermaid(source: string): MermaidNarration {
   const nodeLabels = new Map<string, string>()
   const edgeDescs: string[] = []
 
+  // Specific shapes before generic ones: stadium ([ ]), subroutine [[ ]],
+  // then rectangle [ ], rounded ( ), diamond { }.
   const nodeDefRe =
-    /\b([A-Za-z][\w]*)\s*(?:\[([^\]]*)\]|\(([^\)]*)\)|\{([^\}]*)\}|\(\[([^\]]*)\]\)|\[\[([^\]]*)\]\])/g
+    /\b([A-Za-z][\w]*)\s*(?:\(\[([^\]]*)\]\)|\[\[([^\]]*)\]\]|\[([^\]]*)\]|\(([^\)]*)\)|\{([^\}]*)\})/g
   const edgeRe =
     /\b([A-Za-z][\w]*)\s*(?:-->|---|==>|-.->|==>|-->>|==)\s*(?:\|([^|]+)\|)?\s*([A-Za-z][\w]*)/g
 
@@ -206,6 +212,7 @@ export function narrateMermaid(source: string): MermaidNarration {
     nodeDefRe.lastIndex = 0
     while ((m = nodeDefRe.exec(line)) !== null) {
       const id = m[1]
+      // groups: 2=stadium, 3=subroutine, 4=rectangle, 5=rounded, 6=diamond
       const label = stripMermaidQuotes(m[2] ?? m[3] ?? m[4] ?? m[5] ?? m[6] ?? id)
       if (label) nodeLabels.set(id, label)
     }
@@ -371,19 +378,42 @@ function narrateBadgeGroup(labels: string[]): string | null {
 
 // ─── HTML ─────────────────────────────────────────────────────────────────────
 
+const HIDDEN_HTML_TAGS = new Set(['script', 'style', 'noscript', 'template'])
+
+/** Remove non-visible elements (and their descendants) from a hast tree. */
+function stripHiddenHast(node: HastNodes): void {
+  if (!('children' in node) || !Array.isArray(node.children)) return
+  const next = []
+  for (const child of node.children) {
+    if (child.type === 'element') {
+      const el = child as HastElement
+      if (HIDDEN_HTML_TAGS.has(el.tagName.toLowerCase())) continue
+      stripHiddenHast(el)
+      next.push(child)
+    } else {
+      next.push(child)
+    }
+  }
+  node.children = next as typeof node.children
+}
+
 /**
- * Strip HTML to visible text. Drops script/style/noscript content and attributes.
+ * Extract visible text from HTML via rehype-parse (not tag-stripping regex).
+ * Drops script/style/noscript/template content and never speaks attributes.
  */
 export function htmlToSpeakable(html: string): string {
-  let text = html
-  // Remove non-visible blocks entirely
-  text = text.replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-  text = text.replace(/<!--[\s\S]*?-->/g, ' ')
-  // Self-closing media without useful text
-  text = text.replace(/<(?:br|hr|img|input|meta|link)\b[^>]*\/?>/gi, ' ')
-  // Unwrap remaining tags
-  text = text.replace(/<\/?[^>]+>/g, ' ')
-  return collapseWhitespace(decodeEntities(text))
+  if (!html || !html.trim()) return ''
+  try {
+    const tree = unified()
+      .use(rehypeParse, { fragment: true })
+      .parse(html) as HastRoot
+    stripHiddenHast(tree)
+    // toText walks the AST — attributes are never included
+    return collapseWhitespace(decodeEntities(toText(tree)))
+  } catch {
+    // Malformed input: fail closed to empty rather than leaking markup
+    return ''
+  }
 }
 
 // ─── mdast walk ───────────────────────────────────────────────────────────────

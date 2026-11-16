@@ -55,6 +55,21 @@ describe('narrateMermaid', () => {
     expect(result.text).toMatch(/could not be summarized safely/i)
     expect(result.text).not.toMatch(/leads to/)
   })
+
+  it('prefers specific Mermaid node shapes over generic brackets', () => {
+    const result = narrateMermaid(`flowchart TD
+  A([Start]) --> B[[Subroutine]]
+  B --> C{Decision}
+  C --> D[Process]
+  D --> E(Rounded)
+`)
+    expect(result.text).toMatch(/\bStart\b/)
+    expect(result.text).toMatch(/\bSubroutine\b/)
+    expect(result.text).toMatch(/\bDecision\b/)
+    expect(result.text).toMatch(/\bProcess\b/)
+    expect(result.text).toMatch(/\bRounded\b/)
+    expect(result.text).not.toMatch(/\[Start\]|\(\[|\[\[|\{Decision\}|\[Process\]|\(Rounded\)/)
+  })
 })
 
 describe('narrateCode', () => {
@@ -135,6 +150,24 @@ describe('htmlToSpeakable', () => {
     )
     expect(htmlToSpeakable('<script>alert(1)</script><p>Safe</p>')).toBe('Safe')
     expect(htmlToSpeakable('<style>.x{}</style><div>Visible</div>')).toBe('Visible')
+  })
+
+  it('does not leak attribute text when attributes contain >', () => {
+    expect(htmlToSpeakable('<div title="2 > 1">Visible</div>')).toBe('Visible')
+    expect(htmlToSpeakable("<div title='a > b'>Only</div>")).toBe('Only')
+    expect(
+      htmlToSpeakable('<a href="https://example.com?x=1&y=2" class="btn primary">Click</a>')
+    ).toBe('Click')
+    expect(htmlToSpeakable('<div title="2 > 1">Visible</div>')).not.toMatch(/>|title=/)
+  })
+
+  it('handles nested tags, entities, noscript/template, and malformed HTML', () => {
+    expect(htmlToSpeakable('<div><p>Outer <em>inner</em></p></div>')).toBe('Outer inner')
+    expect(htmlToSpeakable('<p>Tom &amp; Jerry &lt;3</p>')).toMatch(/Tom & Jerry/)
+    expect(htmlToSpeakable('<noscript>Hidden</noscript><p>Shown</p>')).toBe('Shown')
+    expect(htmlToSpeakable('<template><p>Nope</p></template><span>Yes</span>')).toBe('Yes')
+    // Malformed: parser recovers without speaking attribute fragments
+    expect(htmlToSpeakable('<div title="oops>still">Recovered</div>')).toBe('Recovered')
   })
 
   it('handles inline HTML mixed with markdown via the parser', async () => {
