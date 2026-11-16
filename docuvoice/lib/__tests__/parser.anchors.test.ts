@@ -87,6 +87,40 @@ describe('parser heading anchors', () => {
     expect(sections.map((s) => s.anchor)).toEqual(['install', 'install-1', 'install-2'])
   })
 
+  it('advances slugger for empty discarded headings before a duplicate title', async () => {
+    // First "Install" has no body → discarded; GitHub still reserves #install.
+    const md = [
+      '# Install',
+      '',
+      '## Install',
+      '',
+      'Body of the second Install.',
+    ].join('\n')
+    const sections = await parse(md)
+    expect(sections).toHaveLength(1)
+    expect(sections[0].title).toBe('Install')
+    expect(sections[0].anchor).toBe('install-1')
+  })
+
+  it('handles three duplicate titles when the middle heading is discarded', async () => {
+    const md = [
+      '# Install',
+      '',
+      'First body.',
+      '',
+      '## Install',
+      '',
+      '### Install',
+      '',
+      'Third body.',
+    ].join('\n')
+    const sections = await parse(md)
+    expect(sections.map((s) => ({ title: s.title, anchor: s.anchor }))).toEqual([
+      { title: 'Install', anchor: 'install' },
+      { title: 'Install', anchor: 'install-2' },
+    ])
+  })
+
   it('slugs empty headings with github-slugger rules', async () => {
     const md = '# \n\nEmpty one.\n\n# \n\nEmpty two.\n'
     const sections = await parse(md)
@@ -114,5 +148,17 @@ describe('parser heading anchors', () => {
     const sections = await parse('## Alone\n\nBody.\n')
     expect(sections[0].sourceUrl).toBeNull()
     expect(sections[0].headingLevel).toBe(2)
+  })
+
+  it('keeps discarded-heading slug alignment in sourceUrl permalinks', async () => {
+    const sections = await parse(
+      '# Setup\n\n## Setup\n\nDo the setup.\n',
+      { source: SOURCE }
+    )
+    expect(sections).toHaveLength(1)
+    expect(sections[0].anchor).toBe('setup-1')
+    expect(sections[0].sourceUrl).toBe(
+      `https://github.com/acme/app/blob/${SOURCE.commitSha}/README.md#setup-1`
+    )
   })
 })

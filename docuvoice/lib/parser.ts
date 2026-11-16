@@ -93,7 +93,9 @@ export interface ParseOptions {
  * - Each heading starts a new section (title = heading text).
  * - Non-heading nodes are accumulated into the current section.
  * - The section type is determined by the dominant node type within it.
- * - Heading sections get GitHub-compatible anchors via github-slugger.
+ * - Every heading advances github-slugger in document order — including
+ *   empty headings that are later discarded — so kept sections get the
+ *   same anchors GitHub would assign.
  * - Preamble (Introduction) has headingLevel/anchor null.
  * - Throws ParseError if fewer than MIN_SECTIONS sections are produced.
  */
@@ -106,8 +108,8 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
     title: string
     nodes: Content[]
     headingLevel: number | null
-    /** Raw heading text used for slug generation; null for preamble. */
-    headingText: string | null
+    /** Precomputed GitHub slug; null for preamble. */
+    anchor: string | null
   }
 
   const rawSections: RawSection[] = []
@@ -115,7 +117,7 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
     title: 'Introduction',
     nodes: [],
     headingLevel: null,
-    headingText: null,
+    anchor: null,
   }
 
   for (const node of tree.children) {
@@ -127,11 +129,14 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
       }
       const headingText = extractText(heading as unknown as Content)
       const title = headingText.trim() || 'Section'
+      // Advance slugger for every heading in order, even if this section is
+      // later discarded for having no body before the next heading.
+      const anchor = slugger.slug(headingText)
       current = {
         title,
         nodes: [],
         headingLevel: heading.depth,
-        headingText,
+        anchor,
       }
     } else {
       current.nodes.push(node as Content)
@@ -150,8 +155,7 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
     )
   }
 
-  // Build Section objects — slugger walks headings in document order so
-  // duplicate titles get GitHub-compatible -1, -2, … suffixes.
+  // Build Section objects from kept sections (anchors already assigned).
   const sections: Section[] = []
 
   for (let i = 0; i < rawSections.length; i++) {
@@ -173,21 +177,13 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
 
     const text = await stripHtml(rawMarkdown)
 
-    let headingLevel: number | null = null
-    let anchor: string | null = null
-    if (raw.headingLevel != null && raw.headingText != null) {
-      headingLevel = raw.headingLevel
-      // github-slugger matches GitHub's duplicate-heading suffix rules
-      anchor = slugger.slug(raw.headingText)
-    }
-
     sections.push({
       index: i,
       title: raw.title,
       type,
       text: text || raw.title,
-      headingLevel,
-      anchor,
+      headingLevel: raw.headingLevel,
+      anchor: raw.anchor,
       sourceUrl: null,
     })
   }
