@@ -2,6 +2,20 @@
 
 export type SectionType = 'introduction' | 'code' | 'warning' | 'steps'
 
+/** Immutable GitHub revision metadata for a narrated README. */
+export interface SourceMetadata {
+  /** Original user-facing GitHub URL (typically https://github.com/owner/repo). */
+  url: string
+  /** owner/repo */
+  repo: string
+  /** Default branch name resolved at fetch time. */
+  ref: string
+  /** Exact commit SHA the README was downloaded from. */
+  commitSha: string
+  /** Path to the README within the repo (e.g. README.md). */
+  path: string
+}
+
 export interface Section {
   index: number
   title: string
@@ -9,6 +23,12 @@ export interface Section {
   text: string
   startTimestamp?: number
   endTimestamp?: number
+  /** Markdown heading depth (1–6). Null for preamble / non-heading sections. */
+  headingLevel?: number | null
+  /** GitHub-compatible heading anchor. Null when not derived from a heading. */
+  anchor?: string | null
+  /** Permalink to the source revision (+ optional #anchor). */
+  sourceUrl?: string | null
 }
 
 // ─── Audio types ──────────────────────────────────────────────────────────────
@@ -28,6 +48,8 @@ export interface AudioTimeline {
   createdAt: Date
   /** Document title derived from the first heading, used for filenames */
   title: string
+  /** Present when the document was fetched from a pinned GitHub revision. */
+  source?: SourceMetadata
 }
 
 // ─── Processing / SSE types ───────────────────────────────────────────────────

@@ -3,8 +3,10 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
-import type { Root, Content, Heading, Code, Blockquote, List } from 'mdast'
-import type { SectionType, Section } from '@/types'
+import GithubSlugger from 'github-slugger'
+import type { Root, Content, Heading } from 'mdast'
+import type { SectionType, Section, SourceMetadata } from '@/types'
+import { attachSectionSourceUrls } from '@/lib/githubSource'
 
 const MIN_SECTIONS = 1
 
@@ -76,6 +78,11 @@ function classifyNode(node: Content): SectionType | null {
   }
 }
 
+export interface ParseOptions {
+  /** When set, each section gets a permalink sourceUrl for that revision. */
+  source?: SourceMetadata
+}
+
 // ─── Main parser ──────────────────────────────────────────────────────────────
 
 /**
@@ -86,29 +93,45 @@ function classifyNode(node: Content): SectionType | null {
  * - Each heading starts a new section (title = heading text).
  * - Non-heading nodes are accumulated into the current section.
  * - The section type is determined by the dominant node type within it.
+ * - Heading sections get GitHub-compatible anchors via github-slugger.
+ * - Preamble (Introduction) has headingLevel/anchor null.
  * - Throws ParseError if fewer than MIN_SECTIONS sections are produced.
  */
-export async function parse(rawText: string): Promise<Section[]> {
+export async function parse(rawText: string, options?: ParseOptions): Promise<Section[]> {
   const processor = unified().use(remarkParse)
   const tree = processor.parse(rawText) as Root
+  const slugger = new GithubSlugger()
 
   interface RawSection {
     title: string
     nodes: Content[]
+    headingLevel: number | null
+    /** Raw heading text used for slug generation; null for preamble. */
+    headingText: string | null
   }
 
   const rawSections: RawSection[] = []
-  let current: RawSection = { title: 'Introduction', nodes: [] }
+  let current: RawSection = {
+    title: 'Introduction',
+    nodes: [],
+    headingLevel: null,
+    headingText: null,
+  }
 
   for (const node of tree.children) {
     if (node.type === 'heading') {
+      const heading = node as Heading
       // Flush current section if it has content
       if (current.nodes.length > 0) {
         rawSections.push(current)
       }
+      const headingText = extractText(heading as unknown as Content)
+      const title = headingText.trim() || 'Section'
       current = {
-        title: extractText(node as unknown as Content).trim() || 'Section',
+        title,
         nodes: [],
+        headingLevel: heading.depth,
+        headingText,
       }
     } else {
       current.nodes.push(node as Content)
@@ -127,7 +150,8 @@ export async function parse(rawText: string): Promise<Section[]> {
     )
   }
 
-  // Build Section objects
+  // Build Section objects — slugger walks headings in document order so
+  // duplicate titles get GitHub-compatible -1, -2, … suffixes.
   const sections: Section[] = []
 
   for (let i = 0; i < rawSections.length; i++) {
@@ -149,12 +173,27 @@ export async function parse(rawText: string): Promise<Section[]> {
 
     const text = await stripHtml(rawMarkdown)
 
+    let headingLevel: number | null = null
+    let anchor: string | null = null
+    if (raw.headingLevel != null && raw.headingText != null) {
+      headingLevel = raw.headingLevel
+      // github-slugger matches GitHub's duplicate-heading suffix rules
+      anchor = slugger.slug(raw.headingText)
+    }
+
     sections.push({
       index: i,
       title: raw.title,
       type,
       text: text || raw.title,
+      headingLevel,
+      anchor,
+      sourceUrl: null,
     })
+  }
+
+  if (options?.source) {
+    return attachSectionSourceUrls(sections, options.source)
   }
 
   return sections

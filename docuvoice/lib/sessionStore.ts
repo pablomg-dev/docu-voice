@@ -40,6 +40,7 @@ async function persistToDisk(sessionId: string, entry: StoreEntry): Promise<void
       sessionId: entry.timeline.sessionId,
       title: entry.timeline.title,
       createdAt: entry.timeline.createdAt.toISOString(),
+      source: entry.timeline.source ?? undefined,
       sections: entry.timeline.sections.map((s) => ({
         index: s.index,
         title: s.title,
@@ -47,6 +48,9 @@ async function persistToDisk(sessionId: string, entry: StoreEntry): Promise<void
         text: s.text,
         startTimestamp: s.startTimestamp,
         endTimestamp: s.endTimestamp,
+        headingLevel: s.headingLevel ?? null,
+        anchor: s.anchor ?? null,
+        sourceUrl: s.sourceUrl ?? null,
       })),
       sectionCount: entry.timeline.sectionMp3s.length,
       expiresAt: entry.expiresAt,
@@ -85,6 +89,7 @@ async function loadFromDisk(sessionId: string): Promise<StoreEntry | undefined> 
         sections: meta.sections,
         sectionMp3s,
         fullMp3,
+        ...(meta.source ? { source: meta.source } : {}),
       },
       expiresAt: meta.expiresAt,
     }

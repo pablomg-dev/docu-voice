@@ -5,7 +5,7 @@ import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
 import { createSessionId } from '@/lib/sessionStore'
-import type { AudioSegment, AudioTimeline, Section } from '@/types'
+import type { AudioSegment, AudioTimeline, Section, SourceMetadata } from '@/types'
 
 // Point fluent-ffmpeg at the bundled binaries
 if (ffmpegStatic) {
@@ -80,6 +80,7 @@ export interface AssembleInput {
   transitions: AudioSegment[]
   backgroundMusic?: AudioSegment
   title?: string
+  source?: SourceMetadata
 }
 
 /**
@@ -90,7 +91,7 @@ export interface AssembleInput {
  * Records startTimestamp and endTimestamp (ms) for each section.
  */
 export async function assemble(input: AssembleInput): Promise<AudioTimeline> {
-  const { sections, segments, transitions, backgroundMusic, title = 'DocuVoice Audio' } = input
+  const { sections, segments, transitions, backgroundMusic, title = 'DocuVoice Audio', source } = input
 
   if (segments.length === 0) {
     throw new Error('Cannot assemble an empty segment list')
@@ -179,6 +180,7 @@ export async function assemble(input: AssembleInput): Promise<AudioTimeline> {
       sections: timestampedSections,
       createdAt: new Date(),
       title,
+      ...(source ? { source } : {}),
     }
   } finally {
     await cleanupFiles(tempFiles)
