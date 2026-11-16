@@ -40,7 +40,8 @@ npm run lint       # ESLint
 | File | Purpose |
 |------|---------|
 | `contentFetcher.ts` | Fetches URLs, rewrites GitHub URLs to raw content, 10s timeout |
-| `parser.ts` | Markdown → typed sections (intro/code/warning/steps) via unified/remark/rehype |
+| `parser.ts` | Markdown → typed sections (intro/code/warning/steps) via unified/remark; speakable text via `speakable.ts` |
+| `speakable.ts` | Deterministic podcast narration for Mermaid, code, images/badges, and HTML (no LLM) |
 | `ttsEngine.ts` | ElevenLabs TTS generation, single-voice retry logic |
 | `sfxEngine.ts` | Transition sound effects, graceful fallback to silent buffer |
 | `audioAssembler.ts` | Concatenates segments + transitions via fluent-ffmpeg, computes timestamps |

@@ -1,12 +1,10 @@
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
-import remarkRehype from 'remark-rehype'
-import rehypeSanitize from 'rehype-sanitize'
-import rehypeStringify from 'rehype-stringify'
 import GithubSlugger from 'github-slugger'
 import type { Root, Content, Heading } from 'mdast'
 import type { SectionType, Section, SourceMetadata } from '@/types'
 import { attachSectionSourceUrls } from '@/lib/githubSource'
+import { nodesToSpeakable } from '@/lib/speakable'
 
 const MIN_SECTIONS = 1
 
@@ -31,27 +29,6 @@ function extractText(node: Content | Root): string {
     return node.children.map((c) => extractText(c as Content)).join(' ')
   }
   return ''
-}
-
-/** Strip HTML tags from a string using rehype-sanitize (server-safe). */
-async function stripHtml(markdown: string): Promise<string> {
-  const result = await unified()
-    .use(remarkParse)
-    .use(remarkRehype)
-    .use(rehypeSanitize)
-    .use(rehypeStringify)
-    .process(markdown)
-
-  // Remove remaining HTML tags from the stringified output
-  return String(result)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 /** Classify a top-level mdast node into a SectionType. */
@@ -170,12 +147,8 @@ export async function parse(rawText: string, options?: ParseOptions): Promise<Se
       if (classified === 'steps' && type === 'introduction') type = 'steps'
     }
 
-    // Build plain text for TTS (strip markdown syntax)
-    const rawMarkdown = raw.nodes
-      .map((n) => extractText(n as unknown as Content))
-      .join('\n\n')
-
-    const text = await stripHtml(rawMarkdown)
+    // Build podcast-ready speakable text (Mermaid, code, images, badges, HTML)
+    const text = nodesToSpeakable(raw.nodes)
 
     sections.push({
       index: i,
