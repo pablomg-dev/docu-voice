@@ -231,12 +231,26 @@ function splitDocumentForLimit(document, maxChars = AGENSI_MAX_CHARS) {
     } else {
       for (let p = 0; p < parts.length; p += 1) {
         const partTitle = p === 0 ? section.title : `${section.title}, part ${p + 1}`;
-        chunked.push({
+        const part = {
           index: chunked.length,
           title: partTitle,
           type: section.type,
           text: parts[p],
-        });
+        };
+        // Keep heading/source metadata on the first chunk only.
+        if (p === 0) {
+          if (section.headingLevel !== undefined) part.headingLevel = section.headingLevel;
+          if (section.anchor !== undefined) part.anchor = section.anchor;
+          if (section.sourceUrl !== undefined) part.sourceUrl = section.sourceUrl;
+        } else {
+          part.headingLevel = null;
+          part.anchor = null;
+          if (section.sourceUrl) {
+            const hash = section.sourceUrl.indexOf('#');
+            part.sourceUrl = hash >= 0 ? section.sourceUrl.slice(0, hash) : section.sourceUrl;
+          }
+        }
+        chunked.push(part);
       }
     }
   }
@@ -245,10 +259,12 @@ function splitDocumentForLimit(document, maxChars = AGENSI_MAX_CHARS) {
       `Splitting to ${maxChars} characters produced ${chunked.length} sections, exceeding the ${MAX_SECTIONS}-section limit.`
     );
   }
-  return {
+  const result = {
     title: document.title,
     sections: chunked,
   };
+  if (document.source) result.source = document.source;
+  return result;
 }
 
 function estimateDurationMs(byteLength) {
@@ -267,6 +283,37 @@ function timelinePathFor(mp3Path) {
   const ext = path.extname(resolved);
   const base = ext ? resolved.slice(0, -ext.length) : resolved;
   return `${base}.timeline.json`;
+}
+
+function optionalNullString(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function optionalHeadingLevel(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Number.isInteger(value) && value >= 1 && value <= 6) return value;
+  return undefined;
+}
+
+function normalizeSource(raw) {
+  if (raw === undefined || raw === null) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Document source must be an object with url, repo, ref, commitSha, and path.');
+  }
+  const url = typeof raw.url === 'string' ? raw.url.trim() : '';
+  const repo = typeof raw.repo === 'string' ? raw.repo.trim() : '';
+  const ref = typeof raw.ref === 'string' ? raw.ref.trim() : '';
+  const commitSha = typeof raw.commitSha === 'string' ? raw.commitSha.trim() : '';
+  const pathValue = typeof raw.path === 'string' ? raw.path.trim() : '';
+  if (!url || !repo || !ref || !commitSha || !pathValue) {
+    throw new Error('Document source must include non-empty url, repo, ref, commitSha, and path.');
+  }
+  return { url, repo, ref, commitSha, path: pathValue };
 }
 
 function normalizeSection(entry, i) {
@@ -291,7 +338,14 @@ function normalizeSection(entry, i) {
     ? entry.title.trim().replace(/\s+/g, ' ')
     : `Section ${i + 1}`;
   const index = Number.isInteger(entry.index) && entry.index >= 0 ? entry.index : i;
-  return { index, title, type: entry.type, text };
+  const section = { index, title, type: entry.type, text };
+  const headingLevel = optionalHeadingLevel(entry.headingLevel);
+  if (headingLevel !== undefined) section.headingLevel = headingLevel;
+  const anchor = optionalNullString(entry.anchor);
+  if (anchor !== undefined) section.anchor = anchor;
+  const sourceUrl = optionalNullString(entry.sourceUrl);
+  if (sourceUrl !== undefined) section.sourceUrl = sourceUrl;
+  return section;
 }
 
 function parseSectionsDocument(parsed) {
@@ -313,10 +367,15 @@ function parseSectionsDocument(parsed) {
   const givenTitle = !Array.isArray(parsed) && parsed && typeof parsed.title === 'string'
     ? parsed.title.trim().replace(/\s+/g, ' ')
     : '';
-  return {
+  const document = {
     title: givenTitle || sections[0].title,
     sections,
   };
+  if (!Array.isArray(parsed) && parsed && Object.prototype.hasOwnProperty.call(parsed, 'source')) {
+    const source = normalizeSource(parsed.source);
+    if (source) document.source = source;
+  }
+  return document;
 }
 
 async function loadSections(jsonPath) {
@@ -469,6 +528,7 @@ function buildTimeline({
   characters,
   sfxByteLength,
   sections,
+  source,
 }) {
   let cursor = 0;
   const rows = [];
@@ -476,7 +536,7 @@ function buildTimeline({
     const section = sections[i];
     const startMs = cursor;
     cursor += estimateDurationMs(section.byteLength);
-    rows.push({
+    const row = {
       index: section.index,
       title: section.title,
       type: section.type,
@@ -484,12 +544,16 @@ function buildTimeline({
       voiceId: section.voiceId,
       startMs,
       endMs: cursor,
-    });
+    };
+    if (section.headingLevel !== undefined) row.headingLevel = section.headingLevel;
+    if (section.anchor !== undefined) row.anchor = section.anchor;
+    if (section.sourceUrl !== undefined) row.sourceUrl = section.sourceUrl;
+    rows.push(row);
     if (sfxByteLength && i < sections.length - 1) {
       cursor += estimateDurationMs(sfxByteLength);
     }
   }
-  return {
+  const timeline = {
     title,
     provider,
     model,
@@ -501,6 +565,8 @@ function buildTimeline({
     characters,
     sections: rows,
   };
+  if (source) timeline.source = source;
+  return timeline;
 }
 
 async function writeFileEnsured(outputPath, data) {
@@ -724,14 +790,21 @@ async function loadAssembleManifest(manifestPath, cliMode) {
       : typeof entry.text === 'string'
         ? entry.text.trim().length
         : 0;
-    sections.push({
+    const section = {
       index,
       title,
       type: entry.type,
       voice: { name: voiceName, voiceId },
       audio,
       characters,
-    });
+    };
+    const headingLevel = optionalHeadingLevel(entry.headingLevel);
+    if (headingLevel !== undefined) section.headingLevel = headingLevel;
+    const anchor = optionalNullString(entry.anchor);
+    if (anchor !== undefined) section.anchor = anchor;
+    const sourceUrl = optionalNullString(entry.sourceUrl);
+    if (sourceUrl !== undefined) section.sourceUrl = sourceUrl;
+    sections.push(section);
   }
 
   const givenTitle =
@@ -745,20 +818,26 @@ async function loadAssembleManifest(manifestPath, cliMode) {
         : path.resolve(manifestDir, parsed.sfxPath)
       : null;
 
+  const manifest = {
+    title: givenTitle || sections[0].title,
+    model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : AGENSI_TTS_MODEL,
+    provider: typeof parsed.provider === 'string' && parsed.provider.trim() ? parsed.provider.trim() : 'agensi',
+    mode,
+    sfxPath: sfxResolved,
+    characters:
+      Number.isInteger(parsed.characters) && parsed.characters >= 0
+        ? parsed.characters
+        : sections.reduce((sum, s) => sum + s.characters, 0),
+    sections,
+  };
+  if (Object.prototype.hasOwnProperty.call(parsed, 'source')) {
+    const source = normalizeSource(parsed.source);
+    if (source) manifest.source = source;
+  }
+
   return {
     resolved,
-    manifest: {
-      title: givenTitle || sections[0].title,
-      model: typeof parsed.model === 'string' && parsed.model.trim() ? parsed.model.trim() : AGENSI_TTS_MODEL,
-      provider: typeof parsed.provider === 'string' && parsed.provider.trim() ? parsed.provider.trim() : 'agensi',
-      mode,
-      sfxPath: sfxResolved,
-      characters:
-        Number.isInteger(parsed.characters) && parsed.characters >= 0
-          ? parsed.characters
-          : sections.reduce((sum, s) => sum + s.characters, 0),
-      sections,
-    },
+    manifest,
   };
 }
 
@@ -813,6 +892,7 @@ async function main(argv) {
       output: assembled.outputPath,
       characters: manifest.characters,
       sfxByteLength: assembled.sfxApplied && sfxAudio ? sfxAudio.length : 0,
+      source: manifest.source,
       sections: manifest.sections.map((section) => ({
         index: section.index,
         title: section.title,
@@ -820,6 +900,9 @@ async function main(argv) {
         voiceName: section.voice.name,
         voiceId: section.voice.voiceId,
         byteLength: section.audio.length,
+        headingLevel: section.headingLevel,
+        anchor: section.anchor,
+        sourceUrl: section.sourceUrl,
       })),
     });
     const writtenTimeline = await writeFileEnsured(timelinePath, `${JSON.stringify(timeline, null, 2)}\n`);
@@ -873,6 +956,7 @@ async function main(argv) {
     output: assembled.outputPath,
     characters,
     sfxByteLength: assembled.sfxApplied && sfxAudio ? sfxAudio.length : 0,
+    source: document.source,
     sections: spoken.map((section) => ({
       index: section.index,
       title: section.title,
@@ -880,6 +964,9 @@ async function main(argv) {
       voiceName: section.voice.name,
       voiceId: section.voice.voiceId,
       byteLength: section.audio.length,
+      headingLevel: section.headingLevel,
+      anchor: section.anchor,
+      sourceUrl: section.sourceUrl,
     })),
   });
   const writtenTimeline = await writeFileEnsured(timelinePath, `${JSON.stringify(timeline, null, 2)}\n`);

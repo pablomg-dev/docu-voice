@@ -2,6 +2,16 @@
 
 All notable changes to the `DocuVoice: README to Podcast` Agensi skill are documented in this file.
 
+## [1.2.0] - 2026-11-16
+
+### Added
+- **Optional source traceability:** Sections JSON and assemble manifests may include a top-level `source` object (`url`, `repo`, `ref`, `commitSha`, `path`). Timelines copy it through when present.
+- **Optional heading anchors per section:** `headingLevel`, `anchor`, and `sourceUrl` are preserved from input sections into `.timeline.json` (and into `--assemble` / `--split` output). Introduction / preamble sections use `headingLevel: null` and `anchor: null`.
+- Permalink shape when source is known: `https://github.com/{owner}/{repo}/blob/{commitSha}/{path}#{anchor}` (fragment omitted when there is no anchor).
+
+### Compatibility
+- CLI users are **not** required to call GitHub or supply `source`. Legacy sections JSON and timelines without these fields keep working unchanged.
+
 ## [1.1.0] - 2026-11-13
 
 ### Added

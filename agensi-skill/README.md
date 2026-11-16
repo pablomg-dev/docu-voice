@@ -59,6 +59,10 @@ node scripts/narrate.mjs examples/sample-sections.json --mode multi --sfx on --o
 
 The command writes `podcast.mp3` and `podcast.timeline.json` in the current directory. `--mode` is `single` or `multi` (default `multi`). `--sfx` is `on` or `off` (default `on`). Timestamps in the timeline are estimated from MP3 size at 128 kbps.
 
+### Optional source traceability (v1.2+)
+
+`examples/sample-sections.json` shows an optional top-level `source` object (`url`, `repo`, `ref`, `commitSha`, `path`) plus per-section `headingLevel`, `anchor`, and `sourceUrl`. The CLI copies these into the timeline when present. It never calls GitHub — omit `source` for pasted docs or when you have not pinned a commit.
+
 Check syntax without calling any API:
 
 ```bash

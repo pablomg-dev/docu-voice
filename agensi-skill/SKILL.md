@@ -2,7 +2,7 @@
 name: "DocuVoice: README to Podcast"
 description: "Narrate a GitHub README, Markdown file, or pasted documentation as a local MP3 podcast. Classifies sections as introduction, code, warning, or steps, speaks them with ElevenLabs in one voice or four, and writes the audio plus a timeline. Uses Agensi's ElevenLabs tool by default (paid from your Agensi balance, no API key required), with your own ELEVENLABS_API_KEY as an optional fallback."
 summary: "Turns a README or Markdown document into a local multi-voice MP3 using Agensi's ElevenLabs tool (no key required) or your own ElevenLabs API key."
-version: "1.1.0"
+version: "1.2.0"
 tags:
   - documentation
   - podcast
@@ -170,18 +170,44 @@ UTF-8 JSON, either an object or a bare array:
 ```json
 {
   "title": "Document title",
+  "source": {
+    "url": "https://github.com/owner/repo",
+    "repo": "owner/repo",
+    "ref": "main",
+    "commitSha": "0123456789abcdef0123456789abcdef01234567",
+    "path": "README.md"
+  },
   "sections": [
     {
       "index": 0,
       "title": "Introduction",
       "type": "introduction",
-      "text": "Introduction. This project generates a local podcast from a README."
+      "text": "Introduction. This project generates a local podcast from a README.",
+      "headingLevel": null,
+      "anchor": null,
+      "sourceUrl": "https://github.com/owner/repo/blob/0123456789abcdef0123456789abcdef01234567/README.md"
+    },
+    {
+      "index": 1,
+      "title": "Install",
+      "type": "steps",
+      "text": "Install. First clone the repository. Second run npm install.",
+      "headingLevel": 2,
+      "anchor": "install",
+      "sourceUrl": "https://github.com/owner/repo/blob/0123456789abcdef0123456789abcdef01234567/README.md#install"
     }
   ]
 }
 ```
 
 `type` is exactly `introduction`, `code`, `warning`, or `steps`. `text` is the speakable narration and must be non-empty. `index` may be omitted. `title` may be omitted and then defaults to `Section N`. The document `title` is optional. Do not add a voice id; voices come from the section type and mode. Keep each `text` at or under **5,000 characters** (required for Agensi's `elevenlabs:text-to-speech`; BYOK `eleven_turbo_v2_5` caps at 40,000).
+
+**Source traceability (optional):** You may include a top-level `source` object and per-section `headingLevel` / `anchor` / `sourceUrl`. The CLI does **not** call GitHub for you — only pass these when you already know them (for example after resolving a commit SHA yourself). Omit them entirely for pasted text or when you did not pin a revision. Rules when you do include them:
+
+- `source` fields: `url`, `repo` (`owner/repo`), `ref` (branch name), `commitSha` (full SHA), `path` (README path in that commit).
+- Heading sections: set `headingLevel` to 1–6 and `anchor` to a GitHub-compatible slug (duplicate headings get `-1`, `-2`, …). Preamble `Introduction` uses `headingLevel: null` and `anchor: null`.
+- `sourceUrl` = `https://github.com/{owner}/{repo}/blob/{commitSha}/{path}` plus `#{anchor}` when an anchor exists.
+- Timelines and `--assemble` / `--split` preserve these fields when present; legacy JSON without them still works.
 
 Write this file outside the skill folder. Remember the absolute path.
 
