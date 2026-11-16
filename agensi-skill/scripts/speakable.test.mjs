@@ -181,4 +181,14 @@ describe('htmlToSpeakable comparisons', () => {
   it('does not treat TypeScript-like generics as tags', () => {
     assert.equal(htmlToSpeakable('Returns Foo<T> and Bar<U, V>.'), 'Returns Foo<T> and Bar<U, V>.');
   });
+
+  it('preserves incomplete tags that never close', () => {
+    assert.equal(htmlToSpeakable('Ends with <div'), 'Ends with <div');
+    assert.equal(htmlToSpeakable('texto normal <div'), 'texto normal <div');
+  });
+
+  it('still extracts content from complete tags and custom elements', () => {
+    assert.equal(htmlToSpeakable('<div>contenido</div>'), 'contenido');
+    assert.equal(htmlToSpeakable('<my-widget>contenido</my-widget>'), 'contenido');
+  });
 });

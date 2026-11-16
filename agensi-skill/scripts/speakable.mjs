@@ -521,9 +521,9 @@ function isHtmlTagOpen(s, i) {
   while (j < s.length && /[A-Za-z0-9:-]/.test(s[j])) j += 1;
   const name = s.slice(start, j).toLowerCase();
   if (!name) return false;
-  // After the name, HTML allows only whitespace, attributes, `/`, or `>`
-  // Reject generics like `Bar<U, V>` where `,` follows the name
-  if (j < s.length && !/[\s\/>]/.test(s[j])) return false;
+  // After the name, HTML requires a real terminator: whitespace, `/`, or `>`
+  // Reject EOF (`<div`), generics (`Bar<U, V>`), and other non-tag `<` uses
+  if (j >= s.length || !/[\s\/>]/.test(s[j])) return false;
   // Custom elements must contain a hyphen (HTML spec)
   if (name.includes('-')) return true;
   return HTML_TAG_NAMES.has(name);
